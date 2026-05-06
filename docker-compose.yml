@@ -1,0 +1,14 @@
+services:
+  review-bot:
+    build: .
+    container_name: review-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      OLLAMA_URL: http://host.docker.internal:11434
+      DB_PATH: /data/reviews.db
+    volumes:
+      - ./data:/data
+    ports:
+      - "8888:8000"
