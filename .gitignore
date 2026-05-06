@@ -28,3 +28,6 @@ backups/
 
 # claude code
 .claude/
+
+# docs
+gitflow.md
