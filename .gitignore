@@ -1,0 +1,30 @@
+# secrets
+.env
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# IDEs
+.idea/
+.vscode/
+
+# macOS
+.DS_Store
+
+# docker
+*.log
+
+# database
+data/
+backups/
+
+# claude code
+.claude/
