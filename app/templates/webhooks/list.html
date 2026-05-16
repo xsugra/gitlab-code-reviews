@@ -15,6 +15,8 @@
             <th>Project Name</th>
             <th>Webhook URL</th>
             <th>Status</th>
+            <th>Created by</th>
+            <th>Last edit by</th>
             <th>Created</th>
             <th>Actions</th>
         </tr>
@@ -32,6 +34,8 @@
                 <span class="badge badge-disabled">Disabled</span>
                 {% endif %}
             </td>
+            <td>{{ ('@' ~ cfg.created_by) if cfg.created_by else '—' }}</td>
+            <td>{{ ('@' ~ cfg.updated_by) if cfg.updated_by else '—' }}</td>
             <td class="mono">{{ cfg.created_at[:10] }}</td>
             <td class="actions-cell">
                 <a href="/code-review-bot/webhooks/{{ cfg.id }}/edit" role="button" class="outline"
