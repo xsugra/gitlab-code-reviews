@@ -523,3 +523,9 @@ async def health_page(request: Request):
         "health": health,
         "webhook_count": webhook_count,
     })
+
+def _get_session(request: Request) -> dict | None:
+    token = request.cookies.get("session")
+    if not token:
+        return None
+    return _verify_session(token)
