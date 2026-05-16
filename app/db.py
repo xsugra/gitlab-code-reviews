@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS webhook_configs (
     project_name TEXT NOT NULL DEFAULT '',
     webhook_url TEXT NOT NULL,
     enabled INTEGER NOT NULL DEFAULT 1,
+    created_by TEXT NOT NULL DEFAULT '',
+    updated_by TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -40,11 +42,22 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_webhook_configs_project
 """
 
 
+_MIGRATIONS = [
+    "ALTER TABLE webhook_configs ADD COLUMN created_by TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE webhook_configs ADD COLUMN updated_by TEXT NOT NULL DEFAULT ''",
+]
+
+
 async def init() -> None:
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     async with aiosqlite.connect(DB_PATH) as conn:
         await conn.execute("PRAGMA journal_mode=WAL")
         await conn.executescript(_SCHEMA)
+        for sql in _MIGRATIONS:
+            try:
+                await conn.execute(sql)
+            except Exception:
+                pass
         await conn.commit()
     log.info("Database initialized at %s", DB_PATH)
 
@@ -121,22 +134,23 @@ async def get_all_webhook_configs() -> list[dict]:
 
 
 async def save_webhook_config(
-        project_id: int, project_name: str, webhook_url: str, enabled: bool = True
+        project_id: int, project_name: str, webhook_url: str, enabled: bool = True,
+        created_by: str = "",
 ) -> int:
     now = datetime.now(timezone.utc).isoformat()
     async with aiosqlite.connect(DB_PATH) as conn:
         cursor = await conn.execute(
             """INSERT INTO webhook_configs
-               (project_id, project_name, webhook_url, enabled, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?)""",
-            (project_id, project_name, webhook_url, int(enabled), now, now),
+               (project_id, project_name, webhook_url, enabled, created_by, updated_by, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (project_id, project_name, webhook_url, int(enabled), created_by, created_by, now, now),
         )
         await conn.commit()
         return cursor.lastrowid
 
 
 async def update_webhook_config(config_id: int, **fields) -> None:
-    allowed = {"project_name", "webhook_url", "enabled"}
+    allowed = {"project_name", "webhook_url", "enabled", "updated_by"}
     updates = {k: v for k, v in fields.items() if k in allowed}
     if not updates:
         return
