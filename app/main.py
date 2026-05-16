@@ -51,6 +51,11 @@ async def homepage(request: Request):
     return templates.TemplateResponse("home.html", {"request": request, "session": None})
 
 
+@app.get("/api-docs", response_class=HTMLResponse)
+async def api_docs(request: Request):
+    return templates.TemplateResponse("api_docs.html", {"request": request, "session": None})
+
+
 @app.get("/health")
 async def health() -> dict:
     """Basic liveness check."""

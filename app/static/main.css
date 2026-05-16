@@ -245,8 +245,9 @@ nav .brand {
 }
 
 .model-tag {
+    color: white;
     display: inline-block;
-    background: var(--pico-secondary-background);
+    background: var(--pico-primary-background);
     padding: 0.15rem 0.5rem;
     border-radius: 4px;
     font-family: var(--pico-font-family-monospace);
@@ -274,8 +275,12 @@ nav .brand {
 }
 
 @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .actions-row {

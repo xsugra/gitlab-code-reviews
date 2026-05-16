@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+{% block title %}API Documentation • Code Review Bot{% endblock %}
+{% block content %}
+<div class="section-header">
+    <h2>API Documentation</h2>
+    <span class="model-tag">v1.0</span>
+</div>
+
+<p>All endpoints are accessible without authentication unless noted otherwise. Base URL: <code class="mono">http://&lt;server&gt;:8888</code></p>
+
+<h3>Health</h3>
+<article>
+    <table>
+        <thead>
+            <tr>
+                <th>Method</th>
+                <th>Endpoint</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-enabled">GET</span></td>
+                <td class="mono">/health</td>
+                <td>Liveness check. Returns active model name.</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-enabled">GET</span></td>
+                <td class="mono">/health/full</td>
+                <td>Deep health check — verifies Ollama, GitLab, Database, and Google Chat connectivity.</td>
+            </tr>
+        </tbody>
+    </table>
+</article>
+
+<details>
+    <summary><strong>GET /health</strong> — Response example</summary>
+    <pre><code>{
+  "ok": true,
+  "model": "qwen2.5-coder:14b"
+}</code></pre>
+</details>
+
+<details>
+    <summary><strong>GET /health/full</strong> — Response example</summary>
+    <pre><code>{
+  "model": "qwen2.5-coder:14b",
+  "ollama": {
+    "status": "ok",
+    "url": "http://host.docker.internal:11434",
+    "models_available": ["qwen2.5-coder:14b"],
+    "target_model_loaded": true
+  },
+  "gitlab": {
+    "status": "ok",
+    "url": "http://192.168.1.10:8088",
+    "version": {"version": "17.4.0", "revision": "abc123"}
+  },
+  "db": {
+    "status": "ok",
+    "path": "/data/reviews.db",
+    "total_reviews_sampled": 1
+  },
+  "google_chat": {
+    "status": "configured",
+    "webhooks_total": 2,
+    "webhooks_active": 1
+  },
+  "healthy": true
+}</code></pre>
+</details>
+
+<h3>Webhook</h3>
+<article>
+    <table>
+        <thead>
+            <tr>
+                <th>Method</th>
+                <th>Endpoint</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-disabled">POST</span></td>
+                <td class="mono">/webhook</td>
+                <td>Receives GitLab merge request webhook events. Triggers an AI code review.</td>
+            </tr>
+        </tbody>
+    </table>
+</article>
+
+<details>
+    <summary><strong>POST /webhook</strong> — Details</summary>
+    <h4>Headers</h4>
+    <table>
+        <thead>
+            <tr>
+                <th>Header</th>
+                <th>Required</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="mono">X-Gitlab-Token</td>
+                <td>If <code>GITLAB_WEBHOOK_SECRET</code> is set</td>
+                <td>Must match the configured webhook secret</td>
+            </tr>
+            <tr>
+                <td class="mono">X-Gitlab-Event</td>
+                <td>No</td>
+                <td>Event type (logged for debugging)</td>
+            </tr>
+        </tbody>
+    </table>
+    <h4>Accepted events</h4>
+    <ul>
+        <li><code>object_kind: "merge_request"</code> with action <code>open</code>, <code>reopen</code>, or <code>update</code> (with new commits)</li>
+    </ul>
+    <h4>Response</h4>
+    <pre><code>{"queued": true, "project_id": 35, "mr_iid": 12}</code></pre>
+    <p>The review runs asynchronously in the background. Results are posted directly to the MR as a comment.</p>
+</details>
+
+<h3>Reviews</h3>
+<article>
+    <table>
+        <thead>
+            <tr>
+                <th>Method</th>
+                <th>Endpoint</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-enabled">GET</span></td>
+                <td class="mono">/reviews</td>
+                <td>List stored code reviews with optional filters.</td>
+            </tr>
+        </tbody>
+    </table>
+</article>
+
+<details>
+    <summary><strong>GET /reviews</strong> — Query parameters</summary>
+    <table>
+        <thead>
+            <tr>
+                <th>Parameter</th>
+                <th>Type</th>
+                <th>Default</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="mono">project_id</td>
+                <td>int</td>
+                <td>—</td>
+                <td>Filter by GitLab project ID</td>
+            </tr>
+            <tr>
+                <td class="mono">mr_iid</td>
+                <td>int</td>
+                <td>—</td>
+                <td>Filter by merge request IID</td>
+            </tr>
+            <tr>
+                <td class="mono">limit</td>
+                <td>int</td>
+                <td>50</td>
+                <td>Max results (max 200)</td>
+            </tr>
+        </tbody>
+    </table>
+    <h4>Response example</h4>
+    <pre><code>[
+  {
+    "id": 1,
+    "project_id": 35,
+    "project_name": "web/code-reviews",
+    "mr_iid": 3,
+    "mr_title": "feat: add user auth",
+    "mr_url": "http://gitlab.local/web/code-reviews/-/merge_requests/3",
+    "model": "qwen2.5-coder:14b",
+    "chunks_count": 2,
+    "review_text": "## Summary\n...",
+    "created_at": "2025-05-16T14:30:00"
+  }
+]</code></pre>
+</details>
+
+<h3>Admin UI (OAuth required)</h3>
+<article>
+    <table>
+        <thead>
+            <tr>
+                <th>Method</th>
+                <th>Endpoint</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-enabled">GET</span></td>
+                <td class="mono">/code-review-bot/</td>
+                <td>Admin dashboard</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-enabled">GET</span></td>
+                <td class="mono">/code-review-bot/reviews</td>
+                <td>Review history with search and filters</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-enabled">GET</span></td>
+                <td class="mono">/code-review-bot/webhooks</td>
+                <td>Google Chat webhook management</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-enabled">GET</span></td>
+                <td class="mono">/code-review-bot/health</td>
+                <td>System health dashboard</td>
+            </tr>
+        </tbody>
+    </table>
+    <p>All admin routes require GitLab OAuth authentication. Unauthenticated requests are redirected to <code>/code-review-bot/login</code>.</p>
+</article>
+
+<h3>Try it</h3>
+<article>
+    <p>Test the API directly from your terminal:</p>
+    <pre><code># Liveness check
+curl http://localhost:8888/health
+
+# Full system status
+curl http://localhost:8888/health/full | python3 -m json.tool
+
+# List recent reviews
+curl "http://localhost:8888/reviews?limit=5"
+
+# Filter by project
+curl "http://localhost:8888/reviews?project_id=35&mr_iid=3"</code></pre>
+</article>
+{% endblock %}

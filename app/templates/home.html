@@ -1,10 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Code Review Bot{% endblock %}
+{% block title %}Home • Code Review Bot{% endblock %}
 {% block content %}
 <div class="hero-section">
     <img src="/static/logo.png" alt="Code Review Bot">
     <h1>GitLab Code Review Bot</h1>
-    <p>Automated AI-powered code reviews for your GitLab merge requests. Runs locally with Ollama and posts inline comments directly to your MRs.</p>
+    <p>Automated AI-powered code reviews for your GitLab merge requests. Runs locally with Ollama and posts inline
+        comments directly to your MRs.</p>
     <span class="overall-badge loading" id="overall-badge">
         <span class="status-dot status-unknown"></span>
         Checking status...
@@ -52,33 +53,33 @@
     <div class="overflow-auto">
         <table>
             <thead>
-                <tr>
-                    <th>Service</th>
-                    <th>Status</th>
-                    <th>Details</th>
-                </tr>
+            <tr>
+                <th>Service</th>
+                <th>Status</th>
+                <th>Details</th>
+            </tr>
             </thead>
             <tbody id="service-tbody">
-                <tr>
-                    <td>Ollama</td>
-                    <td><span class="status-dot status-unknown"></span> <span id="row-ollama-status">—</span></td>
-                    <td id="row-ollama-detail">Waiting for health check...</td>
-                </tr>
-                <tr>
-                    <td>GitLab</td>
-                    <td><span class="status-dot status-unknown"></span> <span id="row-gitlab-status">—</span></td>
-                    <td id="row-gitlab-detail">Waiting for health check...</td>
-                </tr>
-                <tr>
-                    <td>Database</td>
-                    <td><span class="status-dot status-unknown"></span> <span id="row-db-status">—</span></td>
-                    <td id="row-db-detail">Waiting for health check...</td>
-                </tr>
-                <tr>
-                    <td>Google Chat</td>
-                    <td><span class="status-dot status-unknown"></span> <span id="row-gchat-status">—</span></td>
-                    <td id="row-gchat-detail">Waiting for health check...</td>
-                </tr>
+            <tr>
+                <td>Ollama</td>
+                <td><span class="status-dot status-unknown"></span> <span id="row-ollama-status">—</span></td>
+                <td id="row-ollama-detail">Waiting for health check...</td>
+            </tr>
+            <tr>
+                <td>GitLab</td>
+                <td><span class="status-dot status-unknown"></span> <span id="row-gitlab-status">—</span></td>
+                <td id="row-gitlab-detail">Waiting for health check...</td>
+            </tr>
+            <tr>
+                <td>Database</td>
+                <td><span class="status-dot status-unknown"></span> <span id="row-db-status">—</span></td>
+                <td id="row-db-detail">Waiting for health check...</td>
+            </tr>
+            <tr>
+                <td>Google Chat</td>
+                <td><span class="status-dot status-unknown"></span> <span id="row-gchat-status">—</span></td>
+                <td id="row-gchat-detail">Waiting for health check...</td>
+            </tr>
             </tbody>
         </table>
     </div>
@@ -117,8 +118,10 @@
         btn.classList.add('spinning');
 
         fetch('/health/full')
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
+            .then(function (r) {
+                return r.json();
+            })
+            .then(function (data) {
                 btn.classList.remove('spinning');
 
                 var badge = document.getElementById('overall-badge');
@@ -169,7 +172,7 @@
                 document.getElementById('row-gchat-status').previousElementSibling.className = 'status-dot ' + statusClass(gchat.status);
                 document.getElementById('row-gchat-detail').textContent = gchatDetail;
             })
-            .catch(function() {
+            .catch(function () {
                 btn.classList.remove('spinning');
                 var badge = document.getElementById('overall-badge');
                 badge.className = 'overall-badge unhealthy';
