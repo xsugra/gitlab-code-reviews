@@ -12,6 +12,7 @@ from fastapi.templating import Jinja2Templates
 from . import config, db
 from .admin import router as admin_router
 from .reviewer import run_review
+from .admin import _get_session
 
 logging.basicConfig(
     level=getattr(logging, config.LOG_LEVEL.upper(), logging.INFO),
@@ -48,12 +49,14 @@ app.include_router(admin_router)
 
 @app.get("/", response_class=HTMLResponse)
 async def homepage(request: Request):
-    return templates.TemplateResponse("home.html", {"request": request, "session": None})
+    session = _get_session(request)
+    return templates.TemplateResponse("home.html", {"request": request, "session": session})
 
 
 @app.get("/api-docs", response_class=HTMLResponse)
 async def api_docs(request: Request):
-    return templates.TemplateResponse("api_docs.html", {"request": request, "session": None})
+    session = _get_session(request)
+    return templates.TemplateResponse("api_docs.html", {"request": request, "session": session})
 
 
 @app.get("/health")
