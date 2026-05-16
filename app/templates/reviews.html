@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Reviews — Code Review Bot{% endblock %}
+{% block content %}
+<h2>Review History</h2>
+
+<form method="get" action="/code-review-bot/reviews" role="group" style="margin-bottom:1.5rem">
+    <input type="number" name="project_id" placeholder="Project ID" value="{{ filter_project_id }}" min="1">
+    <input type="number" name="mr_iid" placeholder="MR IID" value="{{ filter_mr_iid }}" min="1">
+    <button type="submit">Filter</button>
+    {% if filter_project_id or filter_mr_iid %}
+    <a href="/code-review-bot/reviews" role="button" class="outline secondary">Clear</a>
+    {% endif %}
+</form>
+
+{% if reviews %}
+<p style="color:var(--pico-muted-color)">Showing {{ reviews|length }} review(s).</p>
+
+{% for r in reviews %}
+<details>
+    <summary>
+        <strong>!{{ r.mr_iid }}</strong> —
+        {{ r.mr_title or 'Untitled' }} &nbsp;
+        <span class="mono" style="color:var(--pico-muted-color)">{{ r.project_name }}</span> &nbsp;
+        <span class="mono" style="color:var(--pico-muted-color);font-size:0.8rem">{{ r.created_at[:16] }}</span>
+        {% if r.mr_url %}
+        &nbsp;<a href="{{ r.mr_url }}" target="_blank" style="font-size:0.8rem">open in GitLab</a>
+        {% endif %}
+    </summary>
+    <div class="review-text">{{ r.review_text|md }}</div>
+    <small style="color:var(--pico-muted-color)">
+        Model: {{ r.model }} | Chunks: {{ r.chunks_count }} | Review ID: {{ r.id }}
+    </small>
+</details>
+{% endfor %}
+{% else %}
+<p>No reviews found{% if filter_project_id or filter_mr_iid %} matching your filters{% endif %}.</p>
+{% endif %}
+{% endblock %}

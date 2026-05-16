@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Health — Code Review Bot{% endblock %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+    <h2 style="margin:0">System Health</h2>
+    <a href="/code-review-bot/health" role="button" class="outline secondary" style="padding:0.25rem 0.75rem">Refresh</a>
+</div>
+
+{% if health.get('error') %}
+<article style="border-left:4px solid var(--pico-del-color)">
+    <p><strong>Error:</strong> {{ health.error }}</p>
+</article>
+{% else %}
+
+<div class="stat-grid">
+    {% set ollama = health.get('ollama', {}) %}
+    <article class="stat-card">
+        <h3>
+            <span class="status-dot status-{{ 'ok' if ollama.get('status') == 'ok' else ('warning' if ollama.get('status') == 'warning' else 'error') }}"></span>
+            Ollama
+        </h3>
+        <p>{{ ollama.get('url', 'N/A') }}</p>
+        {% if ollama.get('target_model_loaded') == true %}
+        <p style="color:#28a745">Model loaded</p>
+        {% elif ollama.get('warning') %}
+        <p style="color:#ffc107">{{ ollama.warning }}</p>
+        {% elif ollama.get('error') %}
+        <p style="color:#dc3545">{{ ollama.error }}</p>
+        {% endif %}
+    </article>
+
+    {% set gitlab = health.get('gitlab', {}) %}
+    <article class="stat-card">
+        <h3>
+            <span class="status-dot status-{{ 'ok' if gitlab.get('status') == 'ok' else 'error' }}"></span>
+            GitLab
+        </h3>
+        <p>{{ gitlab.get('url', 'N/A') }}</p>
+        {% if gitlab.get('version') %}
+        <p>v{{ gitlab.version.get('version', '?') }}</p>
+        {% elif gitlab.get('error') %}
+        <p style="color:#dc3545">{{ gitlab.error }}</p>
+        {% endif %}
+    </article>
+
+    {% set db = health.get('db', {}) %}
+    <article class="stat-card">
+        <h3>
+            <span class="status-dot status-{{ 'ok' if db.get('status') == 'ok' else 'error' }}"></span>
+            Database
+        </h3>
+        <p class="mono">{{ db.get('path', 'N/A') }}</p>
+        {% if db.get('error') %}
+        <p style="color:#dc3545">{{ db.error }}</p>
+        {% endif %}
+    </article>
+
+    {% set gchat = health.get('google_chat', {}) %}
+    <article class="stat-card">
+        <h3>
+            <span class="status-dot status-{{ 'ok' if gchat.get('status') == 'configured' else 'warning' }}"></span>
+            Google Chat
+        </h3>
+        <p>Global: {{ 'Configured' if gchat.get('status') == 'configured' else 'Not configured' }}</p>
+        <p>Per-project: {{ webhook_count }} webhook(s)</p>
+    </article>
+</div>
+
+<details>
+    <summary>Raw health check response</summary>
+    <pre><code>{{ health | tojson(indent=2) }}</code></pre>
+</details>
+
+{% endif %}
+{% endblock %}

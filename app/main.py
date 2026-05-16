@@ -1,11 +1,14 @@
 import logging
+import os
 import time
 from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Query, Request
+from fastapi.staticfiles import StaticFiles
 
 from . import config, db
+from .admin import router as admin_router
 from .reviewer import run_review
 
 logging.basicConfig(
@@ -21,9 +24,9 @@ async def lifespan(application: FastAPI):
     log.info("GITLAB_URL = %s", config.GITLAB_URL)
     log.info("OLLAMA_URL = %s", config.OLLAMA_URL)
     log.info("OLLAMA_MODEL = %s", config.OLLAMA_MODEL)
-    log.info("GOOGLE_CHAT = %s", "configured" if config.GOOGLE_CHAT_WEBHOOK_URL else "NOT configured")
     log.info("WEBHOOK_SECRET = %s", "set" if config.GITLAB_WEBHOOK_SECRET else "NOT set (accepting all)")
     log.info("MAX_CHUNK_CHARS = %s", config.MAX_CHUNK_CHARS)
+    log.info("ADMIN_UI = %s", "enabled" if config.GITLAB_OAUTH_APP_ID else "disabled (set GITLAB_OAUTH_APP_ID to enable)")
     await db.init()
     log.info("=== Review Bot ready ===")
     yield
@@ -31,6 +34,9 @@ async def lifespan(application: FastAPI):
 
 
 app = FastAPI(title="GitLab LLM Code Reviewer", lifespan=lifespan)
+
+app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
+app.include_router(admin_router)
 
 
 @app.get("/health")
@@ -89,9 +95,17 @@ async def health_full() -> dict:
     except Exception as e:
         results["db"] = {"status": "error", "path": db.DB_PATH, "error": str(e)}
 
-    # Check Google Chat
-    if config.GOOGLE_CHAT_WEBHOOK_URL:
-        results["google_chat"] = {"status": "configured"}
+    # Check Google Chat webhooks
+    try:
+        webhooks = await db.get_all_webhook_configs()
+        active = sum(1 for w in webhooks if w.get("enabled"))
+        results["google_chat"] = {
+            "status": "configured" if active > 0 else "not configured",
+            "webhooks_total": len(webhooks),
+            "webhooks_active": active,
+        }
+    except Exception as e:
+        results["google_chat"] = {"status": "error", "error": str(e)}
 
     all_ok = all(
         results[k].get("status") in ("ok", "configured", "not configured")
