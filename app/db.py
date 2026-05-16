@@ -24,12 +24,26 @@ CREATE TABLE IF NOT EXISTS reviews (
 
 CREATE INDEX IF NOT EXISTS idx_reviews_project_mr ON reviews(project_id, mr_iid);
 CREATE INDEX IF NOT EXISTS idx_reviews_created ON reviews(created_at);
+
+CREATE TABLE IF NOT EXISTS webhook_configs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL UNIQUE,
+    project_name TEXT NOT NULL DEFAULT '',
+    webhook_url TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_webhook_configs_project
+    ON webhook_configs(project_id);
 """
 
 
 async def init() -> None:
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute("PRAGMA journal_mode=WAL")
         await conn.executescript(_SCHEMA)
         await conn.commit()
     log.info("Database initialized at %s", DB_PATH)
@@ -74,3 +88,71 @@ async def get_reviews(project_id: int | None = None, mr_iid: int | None = None, 
         cursor = await conn.execute(query, params)
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
+
+
+async def get_webhook_config(project_id: int) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute(
+            "SELECT * FROM webhook_configs WHERE project_id = ?", (project_id,)
+        )
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+
+async def get_webhook_config_by_id(config_id: int) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute(
+            "SELECT * FROM webhook_configs WHERE id = ?", (config_id,)
+        )
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+
+async def get_all_webhook_configs() -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute(
+            "SELECT * FROM webhook_configs ORDER BY project_id"
+        )
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
+
+
+async def save_webhook_config(
+    project_id: int, project_name: str, webhook_url: str, enabled: bool = True
+) -> int:
+    now = datetime.now(timezone.utc).isoformat()
+    async with aiosqlite.connect(DB_PATH) as conn:
+        cursor = await conn.execute(
+            """INSERT INTO webhook_configs
+               (project_id, project_name, webhook_url, enabled, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (project_id, project_name, webhook_url, int(enabled), now, now),
+        )
+        await conn.commit()
+        return cursor.lastrowid
+
+
+async def update_webhook_config(config_id: int, **fields) -> None:
+    allowed = {"project_name", "webhook_url", "enabled"}
+    updates = {k: v for k, v in fields.items() if k in allowed}
+    if not updates:
+        return
+    if "enabled" in updates:
+        updates["enabled"] = int(updates["enabled"])
+    updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+    set_clause = ", ".join(f"{k} = ?" for k in updates)
+    values = list(updates.values()) + [config_id]
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute(
+            f"UPDATE webhook_configs SET {set_clause} WHERE id = ?", values
+        )
+        await conn.commit()
+
+
+async def delete_webhook_config(config_id: int) -> None:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute("DELETE FROM webhook_configs WHERE id = ?", (config_id,))
+        await conn.commit()
