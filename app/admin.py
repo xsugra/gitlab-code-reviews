@@ -363,7 +363,7 @@ async def create_webhook(
             "error": f"A webhook is already configured for project ID {project_id}. Edit it instead.",
         })
 
-    await db.save_webhook_config(project_id, project_name, webhook_url, enabled)
+    await db.save_webhook_config(project_id, project_name, webhook_url, enabled, created_by=session.get("username", ""))
     log.info("Webhook config created for project %s by %s", project_id, session.get("username"))
     return RedirectResponse("/code-review-bot/webhooks", status_code=303)
 
@@ -411,6 +411,7 @@ async def update_webhook(
         project_name=project_name,
         webhook_url=webhook_url,
         enabled=enabled,
+        updated_by=session.get("username", ""),
     )
     log.info("Webhook config %s updated by %s", config_id, session.get("username"))
     return RedirectResponse("/code-review-bot/webhooks", status_code=303)
@@ -440,7 +441,7 @@ async def toggle_webhook(
     cfg = await db.get_webhook_config_by_id(config_id)
     if not cfg:
         raise HTTPException(status_code=404, detail="Webhook config not found")
-    await db.update_webhook_config(config_id, enabled=not cfg["enabled"])
+    await db.update_webhook_config(config_id, enabled=not cfg["enabled"], updated_by=session.get("username", ""))
     log.info("Webhook config %s toggled by %s", config_id, session.get("username"))
     return RedirectResponse("/code-review-bot/webhooks", status_code=303)
 
