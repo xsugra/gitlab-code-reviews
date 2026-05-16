@@ -36,8 +36,9 @@ def _md_to_html(text: str) -> Markup:
 
         if stripped.startswith("```"):
             if in_code:
-                out.append('<pre style="background:var(--pico-card-background-color);padding:0.75rem;border-radius:var(--pico-border-radius);overflow-x:auto;font-size:0.85rem">'
-                           + html_mod.escape("\n".join(code_buf)) + "</pre>")
+                out.append(
+                    '<pre style="background:var(--pico-card-background-color);padding:0.75rem;border-radius:var(--pico-border-radius);overflow-x:auto;font-size:0.85rem">'
+                    + html_mod.escape("\n".join(code_buf)) + "</pre>")
                 code_buf = []
                 in_code = False
             else:
@@ -73,8 +74,9 @@ def _md_to_html(text: str) -> Markup:
         out.append(line)
 
     if in_code and code_buf:
-        out.append('<pre style="background:var(--pico-card-background-color);padding:0.75rem;border-radius:var(--pico-border-radius);overflow-x:auto;font-size:0.85rem">'
-                   + html_mod.escape("\n".join(code_buf)) + "</pre>")
+        out.append(
+            '<pre style="background:var(--pico-card-background-color);padding:0.75rem;border-radius:var(--pico-border-radius);overflow-x:auto;font-size:0.85rem">'
+            + html_mod.escape("\n".join(code_buf)) + "</pre>")
 
     return Markup("<br>".join(out))
 
@@ -213,7 +215,8 @@ async def login_page(request: Request):
 
 
 @router.get("/callback")
-async def oauth_callback(request: Request, code: str = "", state: str = "", error: str = "", error_description: str = ""):
+async def oauth_callback(request: Request, code: str = "", state: str = "", error: str = "",
+                         error_description: str = ""):
     if error:
         log.warning("OAuth error from GitLab: %s — %s", error, error_description)
         raise HTTPException(status_code=400, detail=f"GitLab OAuth error: {error} — {error_description}")

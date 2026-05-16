@@ -1,9 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Health — Code Review Bot{% endblock %}
+{% block title %}Health • Code Review Bot{% endblock %}
 {% block content %}
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
     <h2 style="margin:0">System Health</h2>
-    <a href="/code-review-bot/health" role="button" class="outline secondary" style="padding:0.25rem 0.75rem">Refresh</a>
+    <a href="/code-review-bot/health" role="button" class="outline secondary"
+       style="padding:0.25rem 0.75rem">Refresh</a>
 </div>
 
 {% if health.get('error') %}

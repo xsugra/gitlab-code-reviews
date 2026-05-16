@@ -27,7 +27,8 @@ class GitLabClient:
             if e.response.status_code == 401:
                 log.error("GitLab auth failed (401) — check GITLAB_TOKEN has 'api' scope")
             elif e.response.status_code == 404:
-                log.error("MR not found — project_id=%s mr_iid=%s. Check token has access to this project", project_id, mr_iid)
+                log.error("MR not found — project_id=%s mr_iid=%s. Check token has access to this project", project_id,
+                          mr_iid)
             else:
                 log.error("GitLab returned HTTP %s: %s", e.response.status_code, e.response.text[:300])
             raise

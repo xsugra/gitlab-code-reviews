@@ -10,7 +10,6 @@ Be concise, specific, and actionable. Focus on:
 Skip pure style nitpicks the formatter would catch. If something is fine, do not mention it.
 Always reference the file path and a short code snippet or line marker for each finding."""
 
-
 CHUNK_PROMPT = """Review the following diff chunk from a merge request.
 
 MR title: {title}
@@ -24,7 +23,6 @@ List concrete findings as bullet points. For each finding include:
 - severity: BLOCKING / SUGGESTED / NIT
 
 If you find nothing notable in this chunk, respond with exactly: NO_FINDINGS"""
-
 
 SUMMARY_PROMPT = """You reviewed a merge request in {n_chunks} chunks. Aggregate the findings below into one final review.
 
@@ -56,7 +54,6 @@ Rules:
 - Omit a section entirely if it would be empty.
 - Do not mention chunks or the review process itself.
 - Keep the entire comment under 600 words."""
-
 
 SINGLE_PASS_PROMPT = """Review the following merge request diff.
 

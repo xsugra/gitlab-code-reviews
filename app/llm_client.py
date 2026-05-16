@@ -17,7 +17,8 @@ async def chat(messages: list[dict], num_ctx: int | None = None) -> str:
             "num_ctx": num_ctx or config.OLLAMA_NUM_CTX,
         },
     }
-    log.debug("LLM request: model=%s, messages=%d, num_ctx=%s", config.OLLAMA_MODEL, len(messages), num_ctx or config.OLLAMA_NUM_CTX)
+    log.debug("LLM request: model=%s, messages=%d, num_ctx=%s", config.OLLAMA_MODEL, len(messages),
+              num_ctx or config.OLLAMA_NUM_CTX)
     try:
         async with httpx.AsyncClient(timeout=config.OLLAMA_TIMEOUT_S) as c:
             r = await c.post(f"{config.OLLAMA_URL}/api/chat", json=payload)
@@ -30,7 +31,8 @@ async def chat(messages: list[dict], num_ctx: int | None = None) -> str:
         log.error("Ollama returned HTTP %s: %s", e.response.status_code, e.response.text[:500])
         raise
     except httpx.ReadTimeout:
-        log.error("Ollama request timed out after %ss — diff may be too large or model too slow", config.OLLAMA_TIMEOUT_S)
+        log.error("Ollama request timed out after %ss — diff may be too large or model too slow",
+                  config.OLLAMA_TIMEOUT_S)
         raise
 
     content = data["message"]["content"].strip()

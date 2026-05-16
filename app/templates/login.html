@@ -1,60 +1,22 @@
-<!DOCTYPE html>
-<html lang="en" data-theme="light">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login — Code Review Bot</title>
-    <link rel="stylesheet" href="/static/pico.min.css">
-    <style>
-        body {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-        }
-        .login-card {
-            max-width: 400px;
-            width: 100%;
-            text-align: center;
-        }
-        .login-card h1 {
-            font-size: 1.5rem;
-            margin-bottom: 0.5rem;
-        }
-        .login-card p {
-            color: var(--pico-muted-color);
-            margin-bottom: 1.5rem;
-        }
-        .gitlab-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            width: 100%;
-        }
-        .gitlab-logo {
-            width: 20px;
-            height: 20px;
-        }
-    </style>
-</head>
-<body>
-    <article class="login-card">
-        <img src="/static/logo.png" alt="Code Review Bot" style="width:80px;height:80px;margin-bottom:1rem">
-        <h1>Code Review Bot</h1>
-        <p>Sign in with your GitLab account to manage webhook configurations.</p>
-        <a href="/code-review-bot/start-oauth" role="button" class="gitlab-btn">
-            <svg class="gitlab-logo" viewBox="0 0 380 380" xmlns="http://www.w3.org/2000/svg">
-                <path d="M190 353.2L253.8 157.3H126.2L190 353.2Z" fill="#E24329"/>
-                <path d="M190 353.2L126.2 157.3H24.5L190 353.2Z" fill="#FC6D26"/>
-                <path d="M24.5 157.3L5.2 216.7C3.4 222.2 5.3 228.3 10 232L190 353.2L24.5 157.3Z" fill="#FCA326"/>
-                <path d="M24.5 157.3H126.2L82.9 24.1C80.9 18 72.5 18 70.5 24.1L24.5 157.3Z" fill="#E24329"/>
-                <path d="M190 353.2L253.8 157.3H355.5L190 353.2Z" fill="#FC6D26"/>
-                <path d="M355.5 157.3L374.8 216.7C376.6 222.2 374.7 228.3 370 232L190 353.2L355.5 157.3Z" fill="#FCA326"/>
-                <path d="M355.5 157.3H253.8L297.1 24.1C299.1 18 307.5 18 309.5 24.1L355.5 157.3Z" fill="#E24329"/>
-            </svg>
-            Sign in with GitLab
-        </a>
-    </article>
-</body>
-</html>
+{% extends "base.html" %}
+{% block title %}Login — Code Review Bot{% endblock %}
+{% block body_class %}login-page{% endblock %}
+{% block body %}
+<article class="login-card">
+    <img src="/static/logo.png" alt="Code Review Bot" style="width:80px;height:80px;margin-bottom:1rem">
+    <h1>Code Review Bot</h1>
+    <p>Sign in with your GitLab account to manage webhook configurations.</p>
+    <a href="/code-review-bot/start-oauth" role="button" class="gitlab-btn">
+        <svg class="gitlab-logo" viewBox="0 0 380 380" xmlns="http://www.w3.org/2000/svg">
+            <path d="M190 353.2L253.8 157.3H126.2L190 353.2Z" fill="#E24329"/>
+            <path d="M190 353.2L126.2 157.3H24.5L190 353.2Z" fill="#FC6D26"/>
+            <path d="M24.5 157.3L5.2 216.7C3.4 222.2 5.3 228.3 10 232L190 353.2L24.5 157.3Z" fill="#FCA326"/>
+            <path d="M24.5 157.3H126.2L82.9 24.1C80.9 18 72.5 18 70.5 24.1L24.5 157.3Z" fill="#E24329"/>
+            <path d="M190 353.2L253.8 157.3H355.5L190 353.2Z" fill="#FC6D26"/>
+            <path d="M355.5 157.3L374.8 216.7C376.6 222.2 374.7 228.3 370 232L190 353.2L355.5 157.3Z" fill="#FCA326"/>
+            <path d="M355.5 157.3H253.8L297.1 24.1C299.1 18 307.5 18 309.5 24.1L355.5 157.3Z" fill="#E24329"/>
+        </svg>
+        Sign in with GitLab
+    </a>
+</article>
+{% endblock %}
