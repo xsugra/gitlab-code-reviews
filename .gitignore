@@ -26,8 +26,9 @@ venv/
 data/
 backups/
 
-# claude code
+# AI assistant configs
 .claude/
+.github/copilot-instructions.md
 
 # docs
 gitflow.md
