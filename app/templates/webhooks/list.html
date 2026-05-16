@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Webhooks — Code Review Bot{% endblock %}
+{% block title %}Webhooks • Code Review Bot{% endblock %}
 {% block content %}
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
     <h2 style="margin:0">Webhook Configurations</h2>
@@ -10,59 +10,61 @@
 <div style="overflow-x:auto">
     <table>
         <thead>
-            <tr>
-                <th>Project ID</th>
-                <th>Project Name</th>
-                <th>Webhook URL</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th>Actions</th>
-            </tr>
+        <tr>
+            <th>Project ID</th>
+            <th>Project Name</th>
+            <th>Webhook URL</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Actions</th>
+        </tr>
         </thead>
         <tbody>
-            {% for cfg in configs %}
-            <tr>
-                <td class="mono">{{ cfg.project_id }}</td>
-                <td>{{ cfg.project_name or '—' }}</td>
-                <td class="mono" title="URL is masked for security">{{ mask_url(cfg.webhook_url) }}</td>
-                <td>
-                    {% if cfg.enabled %}
-                    <span class="badge badge-enabled">Enabled</span>
-                    {% else %}
-                    <span class="badge badge-disabled">Disabled</span>
-                    {% endif %}
-                </td>
-                <td class="mono">{{ cfg.created_at[:10] }}</td>
-                <td class="actions-cell">
-                    <a href="/code-review-bot/webhooks/{{ cfg.id }}/edit" role="button" class="outline" style="padding:0.25rem 0.5rem;font-size:0.8rem;margin:0 0.15rem">Edit</a>
+        {% for cfg in configs %}
+        <tr>
+            <td class="mono">{{ cfg.project_id }}</td>
+            <td>{{ cfg.project_name or '—' }}</td>
+            <td class="mono" title="URL is masked for security">{{ mask_url(cfg.webhook_url) }}</td>
+            <td>
+                {% if cfg.enabled %}
+                <span class="badge badge-enabled">Enabled</span>
+                {% else %}
+                <span class="badge badge-disabled">Disabled</span>
+                {% endif %}
+            </td>
+            <td class="mono">{{ cfg.created_at[:10] }}</td>
+            <td class="actions-cell">
+                <a href="/code-review-bot/webhooks/{{ cfg.id }}/edit" role="button" class="outline"
+                   style="padding:0.25rem 0.5rem;font-size:0.8rem;margin:0 0.15rem">Edit</a>
 
-                    <form action="/code-review-bot/webhooks/{{ cfg.id }}/test" method="post">
-                        <input type="hidden" name="csrf_token" value="{{ session.csrf }}">
-                        <button type="submit" class="outline secondary" aria-busy="false">Test</button>
-                    </form>
+                <form action="/code-review-bot/webhooks/{{ cfg.id }}/test" method="post">
+                    <input type="hidden" name="csrf_token" value="{{ session.csrf }}">
+                    <button type="submit" class="outline secondary" aria-busy="false">Test</button>
+                </form>
 
-                    <form action="/code-review-bot/webhooks/{{ cfg.id }}/toggle" method="post">
-                        <input type="hidden" name="csrf_token" value="{{ session.csrf }}">
-                        <button type="submit" class="outline secondary">
-                            {% if cfg.enabled %}Disable{% else %}Enable{% endif %}
-                        </button>
-                    </form>
+                <form action="/code-review-bot/webhooks/{{ cfg.id }}/toggle" method="post">
+                    <input type="hidden" name="csrf_token" value="{{ session.csrf }}">
+                    <button type="submit" class="outline secondary">
+                        {% if cfg.enabled %}Disable{% else %}Enable{% endif %}
+                    </button>
+                </form>
 
-                    <form action="/code-review-bot/webhooks/{{ cfg.id }}/delete" method="post"
-                          onsubmit="return confirm('Delete webhook config for project {{ cfg.project_id }}?')">
-                        <input type="hidden" name="csrf_token" value="{{ session.csrf }}">
-                        <button type="submit" class="outline" style="--pico-color:var(--pico-del-color)">Delete</button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
+                <form action="/code-review-bot/webhooks/{{ cfg.id }}/delete" method="post"
+                      onsubmit="return confirm('Delete webhook config for project {{ cfg.project_id }}?')">
+                    <input type="hidden" name="csrf_token" value="{{ session.csrf }}">
+                    <button type="submit" class="outline" style="--pico-color:var(--pico-del-color)">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
         </tbody>
     </table>
 </div>
 {% else %}
 <article style="text-align:center;padding:3rem">
     <p>No webhook configurations yet.</p>
-    <p>Projects without a webhook will not receive Google Chat notifications (reviews will still be posted to GitLab).</p>
+    <p>Projects without a webhook will not receive Google Chat notifications (reviews will still be posted to
+        GitLab).</p>
     <a href="/code-review-bot/webhooks/new" role="button">Add your first webhook</a>
 </article>
 {% endif %}

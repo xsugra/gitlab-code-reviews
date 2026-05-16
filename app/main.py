@@ -28,7 +28,8 @@ async def lifespan(application: FastAPI):
     log.info("OLLAMA_MODEL = %s", config.OLLAMA_MODEL)
     log.info("WEBHOOK_SECRET = %s", "set" if config.GITLAB_WEBHOOK_SECRET else "NOT set (accepting all)")
     log.info("MAX_CHUNK_CHARS = %s", config.MAX_CHUNK_CHARS)
-    log.info("ADMIN_UI = %s", "enabled" if config.GITLAB_OAUTH_APP_ID else "disabled (set GITLAB_OAUTH_APP_ID to enable)")
+    log.info("ADMIN_UI = %s",
+             "enabled" if config.GITLAB_OAUTH_APP_ID else "disabled (set GITLAB_OAUTH_APP_ID to enable)")
     await db.init()
     log.info("=== Review Bot ready ===")
     yield
@@ -47,7 +48,7 @@ app.include_router(admin_router)
 
 @app.get("/", response_class=HTMLResponse)
 async def homepage(request: Request):
-    return templates.TemplateResponse("home.html", {"request": request})
+    return templates.TemplateResponse("home.html", {"request": request, "session": None})
 
 
 @app.get("/health")
@@ -81,7 +82,8 @@ async def health_full() -> dict:
                 "target_model_loaded": model_found,
             }
             if not model_found:
-                results["ollama"]["warning"] = f"Model '{config.OLLAMA_MODEL}' not found. Run: ollama pull {config.OLLAMA_MODEL}"
+                results["ollama"][
+                    "warning"] = f"Model '{config.OLLAMA_MODEL}' not found. Run: ollama pull {config.OLLAMA_MODEL}"
     except Exception as e:
         results["ollama"] = {"status": "error", "url": config.OLLAMA_URL, "error": str(e)}
 
@@ -95,7 +97,8 @@ async def health_full() -> dict:
             r.raise_for_status()
             results["gitlab"] = {"status": "ok", "url": config.GITLAB_URL, "version": r.json()}
     except httpx.HTTPStatusError as e:
-        results["gitlab"] = {"status": "error", "url": config.GITLAB_URL, "http_code": e.response.status_code, "error": "Authentication failed — check GITLAB_TOKEN"}
+        results["gitlab"] = {"status": "error", "url": config.GITLAB_URL, "http_code": e.response.status_code,
+                             "error": "Authentication failed — check GITLAB_TOKEN"}
     except Exception as e:
         results["gitlab"] = {"status": "error", "url": config.GITLAB_URL, "error": str(e)}
 
@@ -129,19 +132,19 @@ async def health_full() -> dict:
 
 @app.get("/reviews")
 async def list_reviews(
-    project_id: int | None = Query(default=None),
-    mr_iid: int | None = Query(default=None),
-    limit: int = Query(default=50, le=200),
+        project_id: int | None = Query(default=None),
+        mr_iid: int | None = Query(default=None),
+        limit: int = Query(default=50, le=200),
 ) -> list[dict]:
     return await db.get_reviews(project_id=project_id, mr_iid=mr_iid, limit=limit)
 
 
 @app.post("/webhook")
 async def webhook(
-    request: Request,
-    background: BackgroundTasks,
-    x_gitlab_token: str | None = Header(default=None),
-    x_gitlab_event: str | None = Header(default=None),
+        request: Request,
+        background: BackgroundTasks,
+        x_gitlab_token: str | None = Header(default=None),
+        x_gitlab_event: str | None = Header(default=None),
 ) -> dict:
     log.info("Webhook received: event=%s", x_gitlab_event)
 

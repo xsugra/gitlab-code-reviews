@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Dashboard — Code Review Bot{% endblock %}
+{% block title %}Dashboard • Code Review Bot{% endblock %}
 {% block content %}
 <h2>Dashboard</h2>
 
@@ -7,7 +7,8 @@
     <article class="stat-card">
         <h3>
             <span class="status-dot {% if health.get('healthy') %}status-ok{% elif health.get('healthy') == false %}status-error{% else %}status-unknown{% endif %}"></span>
-            {% if health.get('healthy') %}Healthy{% elif health.get('healthy') == false %}Unhealthy{% else %}Unknown{% endif %}
+            {% if health.get('healthy') %}Healthy{% elif health.get('healthy') == false %}Unhealthy{% else %}Unknown{%
+            endif %}
         </h3>
         <p>System Status</p>
     </article>
@@ -30,31 +31,31 @@
 <div style="overflow-x:auto">
     <table>
         <thead>
-            <tr>
-                <th>Date</th>
-                <th>Project</th>
-                <th>MR</th>
-                <th>Model</th>
-                <th>Chunks</th>
-            </tr>
+        <tr>
+            <th>Date</th>
+            <th>Project</th>
+            <th>MR</th>
+            <th>Model</th>
+            <th>Chunks</th>
+        </tr>
         </thead>
         <tbody>
-            {% for r in reviews %}
-            <tr>
-                <td class="mono">{{ r.created_at[:16] }}</td>
-                <td>{{ r.project_name }}</td>
-                <td>
-                    {% if r.mr_url %}
-                    <a href="{{ r.mr_url }}" target="_blank">!{{ r.mr_iid }}</a>
-                    {% else %}
-                    !{{ r.mr_iid }}
-                    {% endif %}
-                    — {{ r.mr_title or '' }}
-                </td>
-                <td class="mono">{{ r.model }}</td>
-                <td>{{ r.chunks_count }}</td>
-            </tr>
-            {% endfor %}
+        {% for r in reviews %}
+        <tr>
+            <td class="mono">{{ r.created_at[:16] }}</td>
+            <td>{{ r.project_name }}</td>
+            <td>
+                {% if r.mr_url %}
+                <a href="{{ r.mr_url }}" target="_blank">!{{ r.mr_iid }}</a>
+                {% else %}
+                !{{ r.mr_iid }}
+                {% endif %}
+                — {{ r.mr_title or '' }}
+            </td>
+            <td class="mono">{{ r.model }}</td>
+            <td>{{ r.chunks_count }}</td>
+        </tr>
+        {% endfor %}
         </tbody>
     </table>
 </div>

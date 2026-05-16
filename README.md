@@ -46,15 +46,15 @@ The bot hooks into your GitLab instance and automatically reviews every merge re
 
 ## Features
 
-| | Feature | Description |
-|---|---|---|
-| :robot: | **AI Code Review** | Single-pass or chunked review using a local Ollama model (no data leaves your network) |
-| :speech_balloon: | **GitLab Integration** | Posts review findings directly as MR comments |
-| :bell: | **Google Chat Notifications** | Rich Card notifications per-project with structured review sections |
-| :globe_with_meridians: | **Admin Dashboard** | Web UI for managing webhooks, browsing reviews, and monitoring health |
-| :lock: | **GitLab OAuth** | Authenticate via your existing GitLab accounts |
-| :whale: | **Docker Deployment** | Single `docker compose up` — no complex setup |
-| :floppy_disk: | **Review History** | All reviews stored in SQLite with search and filtering |
+|                        | Feature                       | Description                                                                            |
+|------------------------|-------------------------------|----------------------------------------------------------------------------------------|
+| :robot:                | **AI Code Review**            | Single-pass or chunked review using a local Ollama model (no data leaves your network) |
+| :speech_balloon:       | **GitLab Integration**        | Posts review findings directly as MR comments                                          |
+| :bell:                 | **Google Chat Notifications** | Rich Card notifications per-project with structured review sections                    |
+| :globe_with_meridians: | **Admin Dashboard**           | Web UI for managing webhooks, browsing reviews, and monitoring health                  |
+| :lock:                 | **GitLab OAuth**              | Authenticate via your existing GitLab accounts                                         |
+| :whale:                | **Docker Deployment**         | Single `docker compose up` — no complex setup                                          |
+| :floppy_disk:          | **Review History**            | All reviews stored in SQLite with search and filtering                                 |
 
 ---
 
@@ -91,10 +91,10 @@ curl http://localhost:8888/health/full
 
 In your GitLab project under **Settings → Webhooks**:
 
-| Field | Value |
-|---|---|
-| URL | `http://<your-host>:8888/webhook` |
-| Trigger | Merge request events |
+| Field        | Value                                     |
+|--------------|-------------------------------------------|
+| URL          | `http://<your-host>:8888/webhook`         |
+| Trigger      | Merge request events                      |
 | Secret token | Value of `GITLAB_WEBHOOK_SECRET` (if set) |
 
 That's it — open a merge request and the bot will review it automatically.
@@ -112,12 +112,12 @@ The admin panel lets any GitLab user configure per-project Google Chat notificat
 1. Go to **User Settings → Applications** (or **Admin → Applications**).
 2. Create an application:
 
-| Field | Value |
-|---|---|
-| Name | `Code Review Bot` |
+| Field        | Value                                              |
+|--------------|----------------------------------------------------|
+| Name         | `Code Review Bot`                                  |
 | Redirect URI | `http://<your-host>:8888/code-review-bot/callback` |
-| Confidential | Yes |
-| Scopes | `read_user` |
+| Confidential | Yes                                                |
+| Scopes       | `read_user`                                        |
 
 3. Copy the **Application ID** and **Secret**.
 
@@ -130,7 +130,8 @@ SESSION_SECRET=$(python -c "import secrets; print(secrets.token_hex(32))")
 ADMIN_BASE_URL=http://<your-host>:8888
 ```
 
-> If `GITLAB_URL` uses a Docker-internal address (e.g. `host.docker.internal`), also set `GITLAB_OAUTH_BASE_URL` to the browser-accessible GitLab URL.
+> If `GITLAB_URL` uses a Docker-internal address (e.g. `host.docker.internal`), also set `GITLAB_OAUTH_BASE_URL` to the
+> browser-accessible GitLab URL.
 
 Rebuild and open `http://<your-host>:8888/code-review-bot/`.
 
@@ -150,29 +151,29 @@ Projects without a webhook still get reviews on GitLab — they just don't get a
 
 ### Core
 
-| Variable | Required | Default | Purpose |
-|---|:---:|---|---|
-| `GITLAB_URL` | Yes | — | GitLab instance base URL |
-| `GITLAB_TOKEN` | Yes | — | GitLab token with `api` scope |
-| `GITLAB_WEBHOOK_SECRET` | — | empty | Validates `X-Gitlab-Token` header |
-| `OLLAMA_URL` | — | `http://ollama:11434` | Ollama API endpoint |
-| `OLLAMA_MODEL` | — | `qwen2.5-coder:14b` | LLM model name |
-| `OLLAMA_NUM_CTX` | — | `32768` | Context window (tokens) |
-| `OLLAMA_TEMPERATURE` | — | `0.2` | Generation temperature |
-| `OLLAMA_TIMEOUT_S` | — | `1800` | LLM request timeout (seconds) |
-| `MAX_CHUNK_CHARS` | — | `80000` | Diff chunk size limit |
-| `DB_PATH` | — | `/data/reviews.db` | SQLite database path |
-| `LOG_LEVEL` | — | `INFO` | Logging level |
+| Variable                | Required | Default               | Purpose                           |
+|-------------------------|:--------:|-----------------------|-----------------------------------|
+| `GITLAB_URL`            |   Yes    | —                     | GitLab instance base URL          |
+| `GITLAB_TOKEN`          |   Yes    | —                     | GitLab token with `api` scope     |
+| `GITLAB_WEBHOOK_SECRET` |    —     | empty                 | Validates `X-Gitlab-Token` header |
+| `OLLAMA_URL`            |    —     | `http://ollama:11434` | Ollama API endpoint               |
+| `OLLAMA_MODEL`          |    —     | `qwen2.5-coder:14b`   | LLM model name                    |
+| `OLLAMA_NUM_CTX`        |    —     | `32768`               | Context window (tokens)           |
+| `OLLAMA_TEMPERATURE`    |    —     | `0.2`                 | Generation temperature            |
+| `OLLAMA_TIMEOUT_S`      |    —     | `1800`                | LLM request timeout (seconds)     |
+| `MAX_CHUNK_CHARS`       |    —     | `80000`               | Diff chunk size limit             |
+| `DB_PATH`               |    —     | `/data/reviews.db`    | SQLite database path              |
+| `LOG_LEVEL`             |    —     | `INFO`                | Logging level                     |
 
 ### Admin UI (GitLab OAuth)
 
-| Variable | Required | Default | Purpose |
-|---|:---:|---|---|
-| `GITLAB_OAUTH_APP_ID` | — | empty | OAuth Application ID |
-| `GITLAB_OAUTH_APP_SECRET` | — | empty | OAuth Application Secret |
-| `SESSION_SECRET` | — | empty | Cookie signing key |
-| `ADMIN_BASE_URL` | — | empty | This service's base URL |
-| `GITLAB_OAUTH_BASE_URL` | — | = `GITLAB_URL` | Browser-accessible GitLab URL |
+| Variable                  | Required | Default        | Purpose                       |
+|---------------------------|:--------:|----------------|-------------------------------|
+| `GITLAB_OAUTH_APP_ID`     |    —     | empty          | OAuth Application ID          |
+| `GITLAB_OAUTH_APP_SECRET` |    —     | empty          | OAuth Application Secret      |
+| `SESSION_SECRET`          |    —     | empty          | Cookie signing key            |
+| `ADMIN_BASE_URL`          |    —     | empty          | This service's base URL       |
+| `GITLAB_OAUTH_BASE_URL`   |    —     | = `GITLAB_URL` | Browser-accessible GitLab URL |
 
 > Leave OAuth variables empty to disable the admin UI. The bot still processes webhooks normally.
 
@@ -182,21 +183,21 @@ Projects without a webhook still get reviews on GitLab — they just don't get a
 
 ### Public
 
-| Method | Endpoint | Description |
-|:---:|---|---|
-| `GET` | `/health` | Liveness check + active model |
-| `GET` | `/health/full` | Deep health check (Ollama, GitLab, DB, webhooks) |
-| `POST` | `/webhook` | GitLab MR webhook receiver |
-| `GET` | `/reviews` | Review history (query: `project_id`, `mr_iid`, `limit`) |
+| Method | Endpoint       | Description                                             |
+|:------:|----------------|---------------------------------------------------------|
+| `GET`  | `/health`      | Liveness check + active model                           |
+| `GET`  | `/health/full` | Deep health check (Ollama, GitLab, DB, webhooks)        |
+| `POST` | `/webhook`     | GitLab MR webhook receiver                              |
+| `GET`  | `/reviews`     | Review history (query: `project_id`, `mr_iid`, `limit`) |
 
 ### Admin UI (GitLab OAuth required)
 
-| Method | Endpoint | Description |
-|:---:|---|---|
-| `GET` | `/code-review-bot/` | Dashboard |
-| `GET` | `/code-review-bot/webhooks` | Webhook management |
-| `GET` | `/code-review-bot/reviews` | Review browser with filters |
-| `GET` | `/code-review-bot/health` | System health dashboard |
+| Method | Endpoint                    | Description                 |
+|:------:|-----------------------------|-----------------------------|
+| `GET`  | `/code-review-bot/`         | Dashboard                   |
+| `GET`  | `/code-review-bot/webhooks` | Webhook management          |
+| `GET`  | `/code-review-bot/reviews`  | Review browser with filters |
+| `GET`  | `/code-review-bot/health`   | System health dashboard     |
 
 ---
 
@@ -208,12 +209,14 @@ Webhook ─▸ Fetch MR ─▸ Fetch Diffs ─▸ Chunk & Review ─▸ Save ─
 ```
 
 **Chunking strategy** for large diffs:
+
 - Split by file first.
 - If a single file exceeds `MAX_CHUNK_CHARS`, split by hunk (`@@` markers).
 - Each chunk is reviewed independently, then findings are aggregated into a final summary.
 - Chunks returning `NO_FINDINGS` are excluded from aggregation.
 
 **Google Chat Cards v2** format:
+
 - Separate cards for each review section (Blocking, Overall, Suggested, Nits, Verdict).
 - Markdown converted to safe HTML (bold, italic, code, links, bullets).
 - Clickable button linking to the MR.
@@ -223,17 +226,18 @@ Webhook ─▸ Fetch MR ─▸ Fetch Diffs ─▸ Chunk & Review ─▸ Save ─
 
 ## Security
 
-| Measure | Implementation |
-|---|---|
-| **Authentication** | GitLab OAuth2 with `read_user` scope |
-| **Sessions** | HMAC-SHA256 signed cookies, HttpOnly, SameSite=Lax, 8h expiry |
-| **CSRF** | Per-session token validated on every POST |
-| **XSS** | Jinja2 autoescaping on all templates |
-| **URL masking** | Webhook URLs shown truncated in list view |
-| **Input validation** | Project ID > 0, webhook URLs must be HTTPS |
-| **Logging** | Webhook URLs and secrets are never logged |
+| Measure              | Implementation                                                |
+|----------------------|---------------------------------------------------------------|
+| **Authentication**   | GitLab OAuth2 with `read_user` scope                          |
+| **Sessions**         | HMAC-SHA256 signed cookies, HttpOnly, SameSite=Lax, 8h expiry |
+| **CSRF**             | Per-session token validated on every POST                     |
+| **XSS**              | Jinja2 autoescaping on all templates                          |
+| **URL masking**      | Webhook URLs shown truncated in list view                     |
+| **Input validation** | Project ID > 0, webhook URLs must be HTTPS                    |
+| **Logging**          | Webhook URLs and secrets are never logged                     |
 
-> **HTTP note**: Without a TLS reverse proxy, OAuth tokens and cookies transit unencrypted. Acceptable on a trusted internal network; add HTTPS for internet-facing deployments.
+> **HTTP note**: Without a TLS reverse proxy, OAuth tokens and cookies transit unencrypted. Acceptable on a trusted
+> internal network; add HTTPS for internet-facing deployments.
 
 ---
 
@@ -241,9 +245,9 @@ Webhook ─▸ Fetch MR ─▸ Fetch Diffs ─▸ Chunk & Review ─▸ Save ─
 
 SQLite with WAL journal mode. Two tables, managed via `CREATE TABLE IF NOT EXISTS` on every startup:
 
-| Table | Purpose |
-|---|---|
-| `reviews` | Review history (project, MR, model, chunks, review text, timestamp) |
+| Table             | Purpose                                                                 |
+|-------------------|-------------------------------------------------------------------------|
+| `reviews`         | Review history (project, MR, model, chunks, review text, timestamp)     |
 | `webhook_configs` | Per-project Google Chat webhooks (project ID, URL, enabled, timestamps) |
 
 ---
@@ -286,8 +290,8 @@ data/
 bash backup.sh
 ```
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `DB_PATH` | `./data/reviews.db` | Database file path |
-| `BACKUP_DIR` | `./backups` | Backup destination |
-| `KEEP_DAYS` | `30` | Retention period (days) |
+| Variable     | Default             | Purpose                 |
+|--------------|---------------------|-------------------------|
+| `DB_PATH`    | `./data/reviews.db` | Database file path      |
+| `BACKUP_DIR` | `./backups`         | Backup destination      |
+| `KEEP_DAYS`  | `30`                | Retention period (days) |

@@ -50,14 +50,14 @@ async def init() -> None:
 
 
 async def save_review(
-    project_id: int,
-    project_name: str,
-    mr_iid: int,
-    mr_title: str,
-    mr_url: str,
-    model: str,
-    chunks_count: int,
-    review_text: str,
+        project_id: int,
+        project_name: str,
+        mr_iid: int,
+        mr_title: str,
+        mr_url: str,
+        model: str,
+        chunks_count: int,
+        review_text: str,
 ) -> int:
     now = datetime.now(timezone.utc).isoformat()
     async with aiosqlite.connect(DB_PATH) as conn:
@@ -121,7 +121,7 @@ async def get_all_webhook_configs() -> list[dict]:
 
 
 async def save_webhook_config(
-    project_id: int, project_name: str, webhook_url: str, enabled: bool = True
+        project_id: int, project_name: str, webhook_url: str, enabled: bool = True
 ) -> int:
     now = datetime.now(timezone.utc).isoformat()
     async with aiosqlite.connect(DB_PATH) as conn:
