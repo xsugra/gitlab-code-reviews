@@ -1,3 +1,4 @@
+<div align="center">
 <p align="center">
   <img src="app/logo/code-reviews-bot-logo.png" alt="Code Reviews Bot" width="180">
 </p>
@@ -16,6 +17,7 @@
   <img src="https://img.shields.io/badge/SQLite-WAL-003B57?logo=sqlite&logoColor=white" alt="SQLite">
   <img src="https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white" alt="Docker">
 </p>
+</div>
 
 ---
 
