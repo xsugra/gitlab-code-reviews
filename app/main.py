@@ -5,7 +5,9 @@ from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 from . import config, db
 from .admin import router as admin_router
@@ -35,8 +37,17 @@ async def lifespan(application: FastAPI):
 
 app = FastAPI(title="GitLab LLM Code Reviewer", lifespan=lifespan)
 
+templates = Jinja2Templates(
+    directory=os.path.join(os.path.dirname(__file__), "templates")
+)
+
 app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
 app.include_router(admin_router)
+
+
+@app.get("/", response_class=HTMLResponse)
+async def homepage(request: Request):
+    return templates.TemplateResponse("home.html", {"request": request})
 
 
 @app.get("/health")
