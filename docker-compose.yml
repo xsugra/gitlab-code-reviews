@@ -3,6 +3,8 @@ services:
     build: .
     container_name: review-bot
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     env_file:
       - .env
     environment:

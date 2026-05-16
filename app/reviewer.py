@@ -228,9 +228,12 @@ async def run_review(project_id: int, mr_iid: int, project_name: str) -> None:
         log.exception("  FAILED to post comment to GitLab")
 
     try:
-        await google_chat.send(summary, title, web_url, project_name)
-        if config.GOOGLE_CHAT_WEBHOOK_URL:
-            log.info("  Sent notification to Google Chat")
+        webhook_config = await db.get_webhook_config(project_id)
+        if webhook_config and webhook_config.get("enabled"):
+            await google_chat.send(summary, title, web_url, project_name, webhook_url=webhook_config["webhook_url"])
+            log.info("  Sent notification to Google Chat for %s", project_name)
+        else:
+            log.info("  No webhook configured for project %s, skipping chat notification", project_name)
     except Exception:
         log.exception("  FAILED to send Google Chat notification")
 

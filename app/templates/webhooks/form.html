@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if config else 'New' }} Webhook — Code Review Bot{% endblock %}
+{% block content %}
+<h2>{{ 'Edit Webhook Configuration' if config else 'New Webhook Configuration' }}</h2>
+
+{% if error %}
+<div class="flash flash-error">{{ error }}</div>
+{% endif %}
+
+<article>
+    <form method="post" action="{{ '/code-review-bot/webhooks/' ~ config.id if config else '/code-review-bot/webhooks' }}">
+        <input type="hidden" name="csrf_token" value="{{ session.csrf }}">
+
+        <label for="project_id">
+            Project ID
+            <input type="number" id="project_id" name="project_id" min="1" required
+                   value="{{ config.project_id if config else '' }}"
+                   placeholder="e.g. 34"
+                   {{ 'readonly' if config else '' }}
+                   aria-describedby="project_id_help">
+            <small id="project_id_help">
+                Find this in GitLab: project Settings &rarr; General &rarr; Project ID.
+                {% if config %}Cannot be changed after creation.{% endif %}
+            </small>
+        </label>
+
+        <label for="project_name">
+            Project Name
+            <input type="text" id="project_name" name="project_name"
+                   value="{{ config.project_name if config else '' }}"
+                   placeholder="e.g. web/my-project"
+                   aria-describedby="project_name_help">
+            <small id="project_name_help">Optional. Used for display purposes only.</small>
+        </label>
+
+        <label for="webhook_url">
+            Google Chat Webhook URL
+            <input type="url" id="webhook_url" name="webhook_url" required
+                   value="{{ config.webhook_url if config else '' }}"
+                   placeholder="https://chat.googleapis.com/v1/spaces/..."
+                   aria-describedby="webhook_url_help">
+            <small id="webhook_url_help">
+                This URL contains sensitive credentials. Get it from Google Chat: Space settings &rarr; Manage webhooks.
+            </small>
+        </label>
+
+        <label>
+            <input type="checkbox" name="enabled" value="true"
+                   {{ 'checked' if (config and config.enabled) or not config else '' }}>
+            Enabled
+        </label>
+
+        <div style="display:flex;gap:0.5rem;margin-top:1rem">
+            <button type="submit">{{ 'Update' if config else 'Create' }}</button>
+            <a href="/code-review-bot/webhooks" role="button" class="outline secondary">Cancel</a>
+        </div>
+    </form>
+</article>
+{% endblock %}
