@@ -219,6 +219,53 @@ async def send(summary: str, mr_title: str, mr_url: str, project_name: str, webh
         r.raise_for_status()
 
 
+EVENT_META = {
+    "push_review": {"icon": "🔀", "title": "Push Review"},
+    "pipeline_analysis": {"icon": "🔴", "title": "Pipeline Failure"},
+    "mr_description": {"icon": "📝", "title": "MR Description Generated"},
+    "issue_triage": {"icon": "🏷️", "title": "Issue Triaged"},
+    "release_notes": {"icon": "🚀", "title": "Release Notes"},
+    "deployment_analysis": {"icon": "📦", "title": "Deployment Report"},
+}
+
+
+def _create_event_card_payload(
+        event_type: str, body: str, title: str, url: str, project_name: str,
+) -> dict:
+    meta = EVENT_META.get(event_type, {"icon": "ℹ️", "title": event_type})
+    header_title = f"{meta['icon']} {meta['title']} — {project_name}"
+
+    body = body if len(body) <= MAX_BODY_CHARS else _truncate_with_formatting(body, MAX_BODY_CHARS)
+    body_html = _render_review_section(body)
+
+    widgets = []
+    if url:
+        widgets.append(_build_button_widget(title, url))
+    widgets.append({"textParagraph": {"text": body_html}})
+
+    card = {
+        "cardId": f"event-{event_type}",
+        "card": {
+            "header": {
+                "title": header_title,
+                "subtitle": title,
+            },
+            "sections": [{"widgets": widgets}],
+        },
+    }
+    return {"cardsV2": [card]}
+
+
+async def send_event(
+        event_type: str, body: str, title: str, url: str,
+        project_name: str, webhook_url: str,
+) -> None:
+    payload = _create_event_card_payload(event_type, body, title, url, project_name)
+    async with httpx.AsyncClient(timeout=30) as c:
+        r = await c.post(webhook_url, json=payload)
+        r.raise_for_status()
+
+
 async def send_test(webhook_url: str, project_name: str = "Test") -> bool:
     payload = {"text": f"Test notification from Code Review Bot for project: {project_name}"}
     async with httpx.AsyncClient(timeout=15) as c:
