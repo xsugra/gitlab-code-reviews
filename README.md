@@ -6,8 +6,8 @@
 <h1 align="center">GitLab Code Reviews Bot</h1>
 
 <p align="center">
-  Automated merge request reviewer powered by a local LLM.<br>
-  Reviews your code, posts findings to GitLab, and notifies via Google Chat.
+  AI-powered GitLab automation — code reviews, pipeline analysis, issue triage, and more.<br>
+  All powered by a local LLM. No data leaves your network.
 </p>
 
 <p align="center">
@@ -24,39 +24,46 @@
 ## Overview
 
 ```text
-┌──────────────┐    MR webhook     ┌──────────────────┐     LLM review    ┌─────────────┐
+┌──────────────┐    webhooks       ┌──────────────────┐    LLM analysis   ┌─────────────┐
 │   GitLab     │ ────────────────▸ │   Review Bot     │ ────────────────▸ │   Ollama    │
-│  (MR event)  │                   │   (FastAPI)      │ ◂──────────────── │  (local AI) │
+│  (events)    │                   │   (FastAPI)      │ ◂──────────────── │  (local AI) │
 └──────────────┘                   │                  │                   └─────────────┘
                                    │  ┌────────────┐  │
 ┌──────────────┐   OAuth + UI      │  │  SQLite DB │  │     notification
 │   Browser    │ ────────────────▸ │  │  reviews   │  │ ────────────────▸  Google Chat
-│  (admin UI)  │ ◂──────────────── │  │  webhooks  │  │                    (per-project)
+│  (admin UI)  │ ◂──────────────── │  │  events    │  │                    (per-project)
 └──────────────┘                   │  └────────────┘  │
                                    └──────────────────┘
 ```
 
-The bot hooks into your GitLab instance and automatically reviews every merge request:
+The bot hooks into your GitLab instance and processes multiple event types:
 
-1. **Receives** MR webhook events (open, reopen, push).
-2. **Fetches** diffs from GitLab API and splits large ones into manageable chunks.
-3. **Reviews** each chunk with a local Ollama model — finds bugs, security issues, and improvements.
-4. **Posts** the review as a comment on the MR.
+1. **Receives** webhook events from GitLab (MR, push, pipeline, issues, deployments, releases, emoji).
+2. **Analyzes** each event with a local Ollama model — reviews code, diagnoses failures, triages issues.
+3. **Posts** findings back to GitLab (MR comments, commit comments, issue labels and notes).
+4. **Saves** all events and reviews to SQLite for history and auditing.
 5. **Notifies** the team via Google Chat (if configured for that project).
 
 ---
 
 ## Features
 
-|                        | Feature                       | Description                                                                            |
-|------------------------|-------------------------------|----------------------------------------------------------------------------------------|
-| :robot:                | **AI Code Review**            | Single-pass or chunked review using a local Ollama model (no data leaves your network) |
-| :speech_balloon:       | **GitLab Integration**        | Posts review findings directly as MR comments                                          |
-| :bell:                 | **Google Chat Notifications** | Rich Card notifications per-project with structured review sections                    |
-| :globe_with_meridians: | **Admin Dashboard**           | Web UI for managing webhooks, browsing reviews, and monitoring health                  |
-| :lock:                 | **GitLab OAuth**              | Authenticate via your existing GitLab accounts                                         |
-| :whale:                | **Docker Deployment**         | Single `docker compose up` — no complex setup                                          |
-| :floppy_disk:          | **Review History**            | All reviews stored in SQLite with search and filtering                                 |
+|                        | Feature                        | Description                                                                            |
+|------------------------|--------------------------------|----------------------------------------------------------------------------------------|
+| :robot:                | **AI Code Review**             | Single-pass or chunked review using a local Ollama model (no data leaves your network) |
+| :pushpin:              | **Push Review**                | Review commits pushed directly to branches (outside MRs)                               |
+| :red_circle:           | **Pipeline Failure Analysis**  | Analyze failed CI/CD job logs, find root cause, suggest fixes                          |
+| :memo:                 | **MR Description Generation**  | Auto-fill empty MR descriptions from the diff                                          |
+| :label:                | **Issue Triage**               | Auto-classify new issues — assign labels, severity, and summary                        |
+| :rocket:               | **Release Notes**              | Generate changelogs from merged MRs when a tag or release is created                   |
+| :package:              | **Deployment Analysis**        | Analyze failed/successful deployments, post reports on commits                         |
+| :repeat:               | **Emoji Re-trigger**           | Re-run a review by adding an emoji (default: :repeat:) to a MR                        |
+| :speech_balloon:       | **GitLab Integration**         | Posts findings as MR comments, commit comments, and issue notes                        |
+| :bell:                 | **Google Chat Notifications**  | Rich Card notifications per-project for all event types                                |
+| :globe_with_meridians: | **Admin Dashboard**            | Web UI for managing webhooks, browsing reviews, and monitoring health                  |
+| :lock:                 | **GitLab OAuth**               | Authenticate via your existing GitLab accounts                                         |
+| :whale:                | **Docker Deployment**          | Single `docker compose up` — no complex setup                                          |
+| :floppy_disk:          | **Event History**              | All reviews and events stored in SQLite with search and filtering                      |
 
 ---
 
@@ -96,8 +103,20 @@ In your GitLab project under **Settings → Webhooks**:
 | Field        | Value                                     |
 |--------------|-------------------------------------------|
 | URL          | `http://<your-host>:8888/webhook`         |
-| Trigger      | Merge request events                      |
 | Secret token | Value of `GITLAB_WEBHOOK_SECRET` (if set) |
+
+Enable the triggers you need:
+
+| Trigger               | What it does                                             |
+|-----------------------|----------------------------------------------------------|
+| Merge request events  | Code review + auto-fill empty MR descriptions            |
+| Push events           | Review commits pushed directly to branches               |
+| Pipeline events       | Analyze failed CI/CD pipelines                           |
+| Work item events      | Auto-triage new issues (labels + severity)               |
+| Deployment events     | Analyze failed/successful deployments                    |
+| Releases events       | Generate release notes from merged MRs                   |
+| Tag push events       | Generate release notes when a tag is pushed              |
+| Emoji events          | Re-trigger review when :repeat: emoji is added to a MR  |
 
 That's it — open a merge request and the bot will review it automatically.
 
@@ -166,6 +185,7 @@ Projects without a webhook still get reviews on GitLab — they just don't get a
 | `MAX_CHUNK_CHARS`       |    —     | `80000`               | Diff chunk size limit             |
 | `DB_PATH`               |    —     | `/data/reviews.db`    | SQLite database path              |
 | `LOG_LEVEL`             |    —     | `INFO`                | Logging level                     |
+| `REVIEW_RETRIGGER_EMOJI`|    —     | `repeat`              | Emoji name that re-triggers review|
 
 ### Admin UI (GitLab OAuth)
 
@@ -189,8 +209,9 @@ Projects without a webhook still get reviews on GitLab — they just don't get a
 |:------:|----------------|---------------------------------------------------------|
 | `GET`  | `/health`      | Liveness check + active model                           |
 | `GET`  | `/health/full` | Deep health check (Ollama, GitLab, DB, webhooks)        |
-| `POST` | `/webhook`     | GitLab MR webhook receiver                              |
+| `POST` | `/webhook`     | GitLab webhook receiver (all event types)                |
 | `GET`  | `/reviews`     | Review history (query: `project_id`, `mr_iid`, `limit`) |
+| `GET`  | `/events`      | Event history (query: `event_type`, `project_id`, `limit`) |
 
 ### Admin UI (GitLab OAuth required)
 
@@ -203,14 +224,16 @@ Projects without a webhook still get reviews on GitLab — they just don't get a
 
 ---
 
-## Review Pipeline
+## Event Processing
+
+All events follow a similar pipeline:
 
 ```text
-Webhook ─▸ Fetch MR ─▸ Fetch Diffs ─▸ Chunk & Review ─▸ Save ─▸ Post
-           metadata      (paginated)    (Ollama LLM)      (DB)   (GitLab + Chat)
+Webhook ─▸ Parse event ─▸ Fetch context ─▸ LLM analysis ─▸ Save ─▸ Post
+           (object_kind)   (GitLab API)    (Ollama)         (DB)   (GitLab + Chat)
 ```
 
-**Chunking strategy** for large diffs:
+**MR Code Review** uses a chunked pipeline for large diffs:
 
 - Split by file first.
 - If a single file exceeds `MAX_CHUNK_CHARS`, split by hunk (`@@` markers).
@@ -219,9 +242,10 @@ Webhook ─▸ Fetch MR ─▸ Fetch Diffs ─▸ Chunk & Review ─▸ Save ─
 
 **Google Chat Cards v2** format:
 
-- Separate cards for each review section (Blocking, Overall, Suggested, Nits, Verdict).
+- MR reviews: separate cards per section (Blocking, Overall, Suggested, Nits, Verdict).
+- Other events: single card with event-specific icon and title.
 - Markdown converted to safe HTML (bold, italic, code, links, bullets).
-- Clickable button linking to the MR.
+- Clickable button linking to the relevant GitLab resource.
 - Graceful truncation at 3500 characters per section.
 
 ---
@@ -245,11 +269,12 @@ Webhook ─▸ Fetch MR ─▸ Fetch Diffs ─▸ Chunk & Review ─▸ Save ─
 
 ## Database
 
-SQLite with WAL journal mode. Two tables, managed via `CREATE TABLE IF NOT EXISTS` on every startup:
+SQLite with WAL journal mode. Three tables, managed via `CREATE TABLE IF NOT EXISTS` on every startup:
 
 | Table             | Purpose                                                                 |
 |-------------------|-------------------------------------------------------------------------|
-| `reviews`         | Review history (project, MR, model, chunks, review text, timestamp)     |
+| `reviews`         | MR review history (project, MR, model, chunks, review text, timestamp)  |
+| `events`          | All other event results (type, project, ref, model, result, timestamp)  |
 | `webhook_configs` | Per-project Google Chat webhooks (project ID, URL, enabled, timestamps) |
 
 ---
@@ -258,19 +283,29 @@ SQLite with WAL journal mode. Two tables, managed via `CREATE TABLE IF NOT EXIST
 
 ```text
 app/
-├── main.py              FastAPI app, webhook handler, health endpoints
+├── main.py              FastAPI app, webhook router, health endpoints
 ├── admin.py             Admin UI: OAuth, sessions, CSRF, webhook CRUD
-├── reviewer.py          5-phase review pipeline
-├── gitlab_client.py     GitLab API client
+├── reviewer.py          MR code review pipeline (chunked)
+├── gitlab_client.py     GitLab API client (shared httpx session)
 ├── llm_client.py        Ollama chat client
 ├── google_chat.py       Google Chat Cards v2 formatting
-├── prompts.py           LLM prompt templates
+├── prompts.py           LLM prompt templates (all event types)
 ├── db.py                SQLite schema and queries
 ├── config.py            Environment variable parsing
+├── handlers/
+│   ├── _common.py       Shared notify + save boilerplate
+│   ├── push_review.py   Push commit review
+│   ├── pipeline_analysis.py  Failed pipeline analysis
+│   ├── mr_description.py     Auto-fill empty MR descriptions
+│   ├── issue_triage.py       Issue classification and labeling
+│   ├── release_notes.py      Changelog generation (release + tag push)
+│   └── deployment_analysis.py  Deployment analysis
 ├── logo/
 │   └── code-reviews-bot-logo.png
 ├── templates/
 │   ├── base.html        Layout with nav and Pico CSS
+│   ├── home.html        Public homepage
+│   ├── api_docs.html    API documentation page
 │   ├── login.html       GitLab OAuth login
 │   ├── dashboard.html   Overview dashboard
 │   ├── reviews.html     Review history browser

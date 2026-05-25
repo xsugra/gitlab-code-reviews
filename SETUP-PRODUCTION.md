@@ -139,7 +139,7 @@ For each GitLab project you want reviewed:
 2. Add webhook:
    - **URL:** `http://192.168.1.20:8888/webhook`
    - **Secret Token:** (same value you'll put in `GITLAB_WEBHOOK_SECRET`)
-   - **Trigger:** Merge request events
+   - **Triggers:** Merge request events, Push events, Pipeline events, Work item events, Deployment events, Releases events, Tag push events, Emoji events
    - **SSL verification:** Disable (since we use HTTP)
 3. Save
 
@@ -190,6 +190,7 @@ GITLAB_OAUTH_APP_SECRET=<from-step-2.2>
 SESSION_SECRET=<generated-secret>
 ADMIN_BASE_URL=http://192.168.1.20:8888
 GITLAB_OAUTH_BASE_URL=http://192.168.1.10:8088
+REVIEW_RETRIGGER_EMOJI=repeat
 ```
 
 ---
@@ -345,5 +346,5 @@ docker compose up -d
 |------|----|---------------|
 | Any PC on network | `http://<BOT_IP>:8888/` | Homepage with live status |
 | Any PC on network | `http://<BOT_IP>:8888/code-review-bot/` | Admin (requires GitLab login) |
-| GitLab server | `http://<BOT_IP>:8888/webhook` | Receives MR events |
+| GitLab server | `http://<BOT_IP>:8888/webhook` | Receives GitLab webhook events |
 | Bot server | `http://<GITLAB_IP>:<PORT>/api/v4/` | Posts review comments |
