@@ -179,7 +179,7 @@ async def webhook(
 
     # ── Merge Request events ─────────────────────────────────────
     if object_kind == "merge_request":
-        return await _handle_mr_webhook(payload, background)
+        return _handle_mr_webhook(payload, background)
 
     # ── Push events ──────────────────────────────────────────────
     if object_kind == "push":
@@ -209,7 +209,7 @@ async def webhook(
     return {"ignored": f"object_kind={object_kind}"}
 
 
-async def _handle_mr_webhook(payload: dict, background: BackgroundTasks) -> dict:
+def _handle_mr_webhook(payload: dict, background: BackgroundTasks) -> dict:
     attrs = payload.get("object_attributes") or {}
     action = attrs.get("action")
     project = payload.get("project") or {}

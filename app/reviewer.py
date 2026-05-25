@@ -121,111 +121,110 @@ async def run_review(project_id: int, mr_iid: int, project_name: str) -> None:
     log.info("========== REVIEW START ==========")
     log.info("Project: %s (id=%s) | MR: !%s", project_name, project_id, mr_iid)
 
-    gl = GitLabClient()
+    async with GitLabClient() as gl:
+        # --- Fetch MR metadata ---
+        log.info("[1/5] Fetching MR metadata from GitLab...")
+        try:
+            mr = await gl.get_mr(project_id, mr_iid)
+            log.info("  MR title: '%s'", mr.get("title"))
+            log.info("  MR author: %s", mr.get("author", {}).get("username", "unknown"))
+            log.info("  MR state: %s", mr.get("state"))
+            log.info("  MR URL: %s", mr.get("web_url"))
+        except Exception:
+            log.exception("[1/5] FAILED to fetch MR metadata from GitLab")
+            return
 
-    # --- Fetch MR metadata ---
-    log.info("[1/5] Fetching MR metadata from GitLab...")
-    try:
-        mr = await gl.get_mr(project_id, mr_iid)
-        log.info("  MR title: '%s'", mr.get("title"))
-        log.info("  MR author: %s", mr.get("author", {}).get("username", "unknown"))
-        log.info("  MR state: %s", mr.get("state"))
-        log.info("  MR URL: %s", mr.get("web_url"))
-    except Exception:
-        log.exception("[1/5] FAILED to fetch MR metadata from GitLab")
-        return
+        # --- Fetch diffs ---
+        log.info("[2/5] Fetching diffs from GitLab...")
+        try:
+            diffs = await gl.get_diffs(project_id, mr_iid)
+            log.info("  Files changed: %d", len(diffs))
+            total_diff_chars = sum(len(d.get("diff") or "") for d in diffs)
+            log.info("  Total diff size: %d chars (~%d tokens)", total_diff_chars, total_diff_chars // 4)
+            for d in diffs:
+                path = d.get("new_path") or d.get("old_path") or "?"
+                size = len(d.get("diff") or "")
+                log.info("    %s (%d chars)", path, size)
+        except Exception:
+            log.exception("[2/5] FAILED to fetch diffs from GitLab")
+            return
 
-    # --- Fetch diffs ---
-    log.info("[2/5] Fetching diffs from GitLab...")
-    try:
-        diffs = await gl.get_diffs(project_id, mr_iid)
-        log.info("  Files changed: %d", len(diffs))
-        total_diff_chars = sum(len(d.get("diff") or "") for d in diffs)
-        log.info("  Total diff size: %d chars (~%d tokens)", total_diff_chars, total_diff_chars // 4)
-        for d in diffs:
-            path = d.get("new_path") or d.get("old_path") or "?"
-            size = len(d.get("diff") or "")
-            log.info("    %s (%d chars)", path, size)
-    except Exception:
-        log.exception("[2/5] FAILED to fetch diffs from GitLab")
-        return
+        if not diffs:
+            log.info("  No diffs found, nothing to review. Done.")
+            return
 
-    if not diffs:
-        log.info("  No diffs found, nothing to review. Done.")
-        return
+        title = mr.get("title") or f"MR !{mr_iid}"
+        description = mr.get("description") or ""
+        web_url = mr.get("web_url") or ""
 
-    title = mr.get("title") or f"MR !{mr_iid}"
-    description = mr.get("description") or ""
-    web_url = mr.get("web_url") or ""
+        # --- Chunk and review ---
+        chunks = split_diffs(diffs, config.MAX_CHUNK_CHARS)
+        log.info("[3/5] Reviewing with LLM (%s)...", config.OLLAMA_MODEL)
+        log.info("  Split into %d chunk(s)", len(chunks))
 
-    # --- Chunk and review ---
-    chunks = split_diffs(diffs, config.MAX_CHUNK_CHARS)
-    log.info("[3/5] Reviewing with LLM (%s)...", config.OLLAMA_MODEL)
-    log.info("  Split into %d chunk(s)", len(chunks))
-
-    try:
-        if len(chunks) == 1:
-            log.info("  Single-pass review (1 chunk)...")
-            t_llm = time.monotonic()
-            summary = await _single_pass(title, description, chunks[0])
-            log.info("  LLM responded in %.1fs", time.monotonic() - t_llm)
-        else:
-            findings: list[str] = []
-            for i, chunk in enumerate(chunks, start=1):
-                log.info("  Reviewing chunk %d/%d (%d chars)...", i, len(chunks), len(chunk))
+        try:
+            if len(chunks) == 1:
+                log.info("  Single-pass review (1 chunk)...")
                 t_llm = time.monotonic()
-                content = await _review_chunk(title, chunk)
-                elapsed = time.monotonic() - t_llm
-                if content.strip().upper() != "NO_FINDINGS":
-                    findings.append(content)
-                    log.info("  Chunk %d done in %.1fs — findings detected", i, elapsed)
-                else:
-                    log.info("  Chunk %d done in %.1fs — no findings", i, elapsed)
-            if not findings:
-                summary = "**Overall:** No issues found.\n\n**Verdict:** Looks good."
-                log.info("  No findings in any chunk.")
+                summary = await _single_pass(title, description, chunks[0])
+                log.info("  LLM responded in %.1fs", time.monotonic() - t_llm)
             else:
-                log.info("  Aggregating %d chunk findings into summary...", len(findings))
-                t_llm = time.monotonic()
-                summary = await _summarize(title, description, findings)
-                log.info("  Summary generated in %.1fs", time.monotonic() - t_llm)
-    except Exception:
-        log.exception("[3/5] FAILED — LLM review error")
-        return
+                findings: list[str] = []
+                for i, chunk in enumerate(chunks, start=1):
+                    log.info("  Reviewing chunk %d/%d (%d chars)...", i, len(chunks), len(chunk))
+                    t_llm = time.monotonic()
+                    content = await _review_chunk(title, chunk)
+                    elapsed = time.monotonic() - t_llm
+                    if content.strip().upper() != "NO_FINDINGS":
+                        findings.append(content)
+                        log.info("  Chunk %d done in %.1fs — findings detected", i, elapsed)
+                    else:
+                        log.info("  Chunk %d done in %.1fs — no findings", i, elapsed)
+                if not findings:
+                    summary = "**Overall:** No issues found.\n\n**Verdict:** Looks good."
+                    log.info("  No findings in any chunk.")
+                else:
+                    log.info("  Aggregating %d chunk findings into summary...", len(findings))
+                    t_llm = time.monotonic()
+                    summary = await _summarize(title, description, findings)
+                    log.info("  Summary generated in %.1fs", time.monotonic() - t_llm)
+        except Exception:
+            log.exception("[3/5] FAILED — LLM review error")
+            return
 
-    log.info("  Review text length: %d chars", len(summary))
+        log.info("  Review text length: %d chars", len(summary))
 
-    # --- Save to DB ---
-    log.info("[4/5] Saving review to database...")
-    try:
-        review_id = await db.save_review(
-            project_id=project_id,
-            project_name=project_name,
-            mr_iid=mr_iid,
-            mr_title=title,
-            mr_url=web_url,
-            model=config.OLLAMA_MODEL,
-            chunks_count=len(chunks),
-            review_text=summary,
+        # --- Save to DB ---
+        log.info("[4/5] Saving review to database...")
+        try:
+            review_id = await db.save_review(
+                project_id=project_id,
+                project_name=project_name,
+                mr_iid=mr_iid,
+                mr_title=title,
+                mr_url=web_url,
+                model=config.OLLAMA_MODEL,
+                chunks_count=len(chunks),
+                review_text=summary,
+            )
+            log.info("  Saved as review id=%s", review_id)
+        except Exception:
+            log.exception("[4/5] FAILED to save review to DB")
+
+        # --- Post to GitLab + Google Chat ---
+        comment = (
+            f"## Automated Code Review\n\n"
+            f"{summary}\n\n"
+            f"---\n"
+            f"_Reviewed by `{config.OLLAMA_MODEL}` across {len(chunks)} chunk(s)._"
         )
-        log.info("  Saved as review id=%s", review_id)
-    except Exception:
-        log.exception("[4/5] FAILED to save review to DB")
 
-    # --- Post to GitLab + Google Chat ---
-    comment = (
-        f"## Automated Code Review\n\n"
-        f"{summary}\n\n"
-        f"---\n"
-        f"_Reviewed by `{config.OLLAMA_MODEL}` across {len(chunks)} chunk(s)._"
-    )
-
-    log.info("[5/5] Posting results...")
-    try:
-        await gl.post_note(project_id, mr_iid, comment)
-        log.info("  Posted comment to GitLab MR !%s", mr_iid)
-    except Exception:
-        log.exception("  FAILED to post comment to GitLab")
+        log.info("[5/5] Posting results...")
+        try:
+            await gl.post_note(project_id, mr_iid, comment)
+            log.info("  Posted comment to GitLab MR !%s", mr_iid)
+        except Exception:
+            log.exception("  FAILED to post comment to GitLab")
 
     try:
         webhook_config = await db.get_webhook_config(project_id)
