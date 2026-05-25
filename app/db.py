@@ -39,6 +39,22 @@ CREATE TABLE IF NOT EXISTS webhook_configs (
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_webhook_configs_project
     ON webhook_configs(project_id);
+
+CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_type TEXT NOT NULL,
+    project_id INTEGER NOT NULL,
+    project_name TEXT NOT NULL,
+    ref_id TEXT,
+    ref_url TEXT,
+    model TEXT NOT NULL,
+    result_text TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type);
+CREATE INDEX IF NOT EXISTS idx_events_project ON events(project_id);
+CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at);
 """
 
 
@@ -170,3 +186,44 @@ async def delete_webhook_config(config_id: int) -> None:
     async with aiosqlite.connect(DB_PATH) as conn:
         await conn.execute("DELETE FROM webhook_configs WHERE id = ?", (config_id,))
         await conn.commit()
+
+
+# ── Events ───────────────────────────────────────────────────────
+
+async def save_event(
+        event_type: str,
+        project_id: int,
+        project_name: str,
+        ref_id: str,
+        ref_url: str,
+        model: str,
+        result_text: str,
+) -> int:
+    now = datetime.now(timezone.utc).isoformat()
+    async with aiosqlite.connect(DB_PATH) as conn:
+        cursor = await conn.execute(
+            """INSERT INTO events
+               (event_type, project_id, project_name, ref_id, ref_url, model, result_text, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (event_type, project_id, project_name, ref_id, ref_url, model, result_text, now),
+        )
+        await conn.commit()
+        return cursor.lastrowid
+
+
+async def get_events(event_type: str | None = None, project_id: int | None = None, limit: int = 50) -> list[dict]:
+    query = "SELECT * FROM events WHERE 1=1"
+    params: list = []
+    if event_type:
+        query += " AND event_type = ?"
+        params.append(event_type)
+    if project_id is not None:
+        query += " AND project_id = ?"
+        params.append(project_id)
+    query += " ORDER BY created_at DESC LIMIT ?"
+    params.append(limit)
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute(query, params)
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows]
