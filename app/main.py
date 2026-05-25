@@ -205,6 +205,10 @@ async def webhook(
     if object_kind == "tag_push":
         return _handle_tag_push_webhook(payload, background)
 
+    # ── Emoji events ──────────────────────────────────────────
+    if object_kind == "emoji":
+        return _handle_emoji_webhook(payload, background)
+
     log.info("Webhook ignored: object_kind=%s", object_kind)
     return {"ignored": f"object_kind={object_kind}"}
 
@@ -333,3 +337,34 @@ def _handle_tag_push_webhook(payload: dict, background: BackgroundTasks) -> dict
     log.info(">>> Release notes (tag push) queued: project=%s tag=%s", project_name, tag)
     background.add_task(handle_tag_push, payload)
     return {"queued": True, "event": "tag_push", "tag": tag}
+
+
+def _handle_emoji_webhook(payload: dict, background: BackgroundTasks) -> dict:
+    attrs = payload.get("object_attributes") or {}
+
+    if attrs.get("action") != "award":
+        log.info("Emoji ignored: action=%s", attrs.get("action"))
+        return {"ignored": "emoji not awarded"}
+
+    if attrs.get("name") != config.REVIEW_RETRIGGER_EMOJI:
+        log.info("Emoji ignored: name=%s (trigger is %s)", attrs.get("name"), config.REVIEW_RETRIGGER_EMOJI)
+        return {"ignored": f"emoji={attrs.get('name')}"}
+
+    if attrs.get("awardable_type") != "MergeRequest":
+        log.info("Emoji ignored: not on a MergeRequest")
+        return {"ignored": "emoji not on MR"}
+
+    mr = payload.get("merge_request")
+    if not mr or not mr.get("iid"):
+        log.info("Emoji ignored: no merge_request in payload")
+        return {"ignored": "no MR data"}
+
+    project = payload.get("project") or {}
+    project_id = project.get("id")
+    mr_iid = mr["iid"]
+    project_name = project.get("path_with_namespace") or "unknown"
+    user = (payload.get("user") or {}).get("username", "unknown")
+
+    log.info(">>> Re-review triggered by emoji from %s: project=%s mr=!%s", user, project_name, mr_iid)
+    background.add_task(run_review, project_id, mr_iid, project_name)
+    return {"queued": True, "event": "emoji_retrigger", "mr_iid": mr_iid}
