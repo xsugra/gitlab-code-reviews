@@ -205,12 +205,14 @@ Projects without a webhook still get reviews on GitLab — they just don't get a
 
 ### Public
 
-| Method | Endpoint       | Description                                             |
-|:------:|----------------|---------------------------------------------------------|
-| `GET`  | `/health`      | Liveness check + active model                           |
-| `GET`  | `/health/full` | Deep health check (Ollama, GitLab, DB, webhooks)        |
+| Method | Endpoint       | Description                                              |
+|:------:|----------------|----------------------------------------------------------|
+| `GET`  | `/`            | Homepage with live status                                |
+| `GET`  | `/api-docs`    | API documentation page                                   |
+| `GET`  | `/health`      | Liveness check + active model                            |
+| `GET`  | `/health/full` | Deep health check (Ollama, GitLab, DB, webhooks)         |
 | `POST` | `/webhook`     | GitLab webhook receiver (all event types)                |
-| `GET`  | `/reviews`     | Review history (query: `project_id`, `mr_iid`, `limit`) |
+| `GET`  | `/reviews`     | Review history (query: `project_id`, `mr_iid`, `limit`)  |
 | `GET`  | `/events`      | Event history (query: `event_type`, `project_id`, `limit`) |
 
 ### Admin UI (GitLab OAuth required)
@@ -293,6 +295,7 @@ app/
 ├── db.py                SQLite schema and queries
 ├── config.py            Environment variable parsing
 ├── handlers/
+│   ├── __init__.py
 │   ├── _common.py       Shared notify + save boilerplate
 │   ├── push_review.py   Push commit review
 │   ├── pipeline_analysis.py  Failed pipeline analysis
@@ -314,6 +317,8 @@ app/
 │       ├── list.html    Webhook table
 │       └── form.html    Add/edit form
 └── static/
+    ├── logo.png         Bot logo for the admin UI
+    ├── main.css         Custom styles
     └── pico.min.css     Bundled CSS (no CDN)
 data/
 └── reviews.db           Persistent database (Docker volume)
