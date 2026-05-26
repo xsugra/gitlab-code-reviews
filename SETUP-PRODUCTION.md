@@ -66,10 +66,10 @@ sudo usermod -aG docker $USER
 curl -fsSL https://ollama.ai/install.sh | sh
 
 # Pull the model (this will download ~8-9GB)
-ollama pull qwen2.5-coder:14b
+ollama pull qwen2.5-coder:14b-instruct-q8_0
 
 # Verify it works
-ollama run qwen2.5-coder:14b "Say hello" --verbose
+ollama run qwen2.5-coder:14b-instruct-q8_0 "Say hello" --verbose
 ```
 
 ### 1.3 Configure Ollama to listen on all interfaces
@@ -178,7 +178,7 @@ GITLAB_URL=http://192.168.1.10:8088
 GITLAB_TOKEN=glpat-xxxxxxxxxxxxxxxxxxxx
 GITLAB_WEBHOOK_SECRET=<generated-secret>
 OLLAMA_URL=http://host.docker.internal:11434
-OLLAMA_MODEL=qwen2.5-coder:14b
+OLLAMA_MODEL=qwen2.5-coder:14b-instruct-q8_0
 OLLAMA_NUM_CTX=32768
 OLLAMA_TEMPERATURE=0.2
 OLLAMA_TIMEOUT_S=1800
