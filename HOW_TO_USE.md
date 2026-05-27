@@ -1,217 +1,237 @@
-# Ako pouzivat Code Review Bot
+# Ako používať Code Review Bot
 
-Tento navod vysvetluje, ako pripojit vas GitLab projekt ku Code Review Botu a volitelne nastavit notifikacie do Google Chat.
+Tento návod vysvetľuje, ako pripojiť váš GitLab projekt ku Code Review Botu a voliteľne nastaviť notifikácie do Google Chat.
 
-> **Predpoklady:** Bot musi byt uz nasadeny a bezat. Pozri [SETUP-PRODUCTION.md](SETUP-PRODUCTION.md) pre nastavenie servera.
+> **Predpoklady:** Bot musí byť už nasadený a bežať. Pozri [SETUP-PRODUCTION.md](SETUP-PRODUCTION.md) pre nastavenie servera.
 
 ---
 
-## Krok 1: Pridanie GitLab webhooku na vas projekt
+## Krok 1: Pridanie GitLab webhooku na váš projekt
 
-Tymto poviete GitLabu, aby posielal udalosti (pushy, merge requesty, atd.) do bota.
+Týmto poviete GitLabu, aby posielal udalosti (push, merge request, atď.) do bota.
 
-1. Otvorte vas GitLab projekt.
-2. Chodte do **Settings > Webhooks**.
+1. Otvorte váš GitLab projekt.
+![image](images/Screenshot%202026-05-27%20at%2016.44.48.png)
+
+2. Choďte do **Settings > Webhooks**.
+![Screenshot 2026-05-27 at 16.45.02.png](images/Screenshot%202026-05-27%20at%2016.45.02.png)
+
 3. Kliknite na **Add new webhook**.
-4. Vyplnte formular:
+![Screenshot 2026-05-27 at 16.45.27.png](images/Screenshot%202026-05-27%20at%2016.45.27.png)
 
-| Pole            | Hodnota                                         |
-|-----------------|-------------------------------------------------|
-| **URL**         | `http://<BOT_IP>:8888/webhook`                  |
-| **Secret token**| Hodnota `GITLAB_WEBHOOK_SECRET` z `.env` (opytajte sa administratora bota) |
+4. Vyplňte formulár:
 
-5. V casti **Trigger** zapiajte udalosti, ktore chcete:
+| Pole             | Hodnota                                                                        |
+|------------------|--------------------------------------------------------------------------------|
+| **URL**          | `http://<BOT_IP>:8888/webhook`                                                 |
+| **Secret token** | Hodnota `GITLAB_WEBHOOK_SECRET` z `.env` (opýtajte sa administrátora bota)    |
 
-| Trigger                  | Co bot robi                                                      |
-|--------------------------|------------------------------------------------------------------|
-| **Merge request events** | AI code review + automaticky vyplni prazdny popis MR             |
-| **Push events**          | Kontroluje commity pushnute priamo do vetvy (mimo MR)            |
-| **Pipeline events**      | Analyzuje zlyhanue CI/CD pipelines — najde pricinu, navrhne opravu |
-| **Work item events**     | Automaticky triedi nove issues — priradi labely, zavaznost a sumar |
-| **Deployment events**    | Analyzuje zlyhane/uspesne deploymenty, postne reporty            |
-| **Releases events**      | Generuje release notes z mergenutych MR pri vytvoreni releasu    |
-| **Tag push events**      | Generuje release notes pri pushnuti noveho tagu                  |
-| **Emoji events**         | Znovu spusti review ked pridate urcitu emoji na MR               |
+![Screenshot 2026-05-27 at 16.45.56.png](images/Screenshot%202026-05-27%20at%2016.45.56.png)
 
-> **Tip:** Mozete zapnut vsetky. Bot spracuje len relevantne udalosti a zvysok ignoruje.
+5. V časti **Trigger** zaškrtnite udalosti, ktoré chcete:
 
-6. Odskrtnite **Enable SSL verification** (pokial nemate HTTPS na bote).
+| Trigger                  | Čo bot robí                                                           |
+|--------------------------|-----------------------------------------------------------------------|
+| **Merge request events** | AI code review + automaticky vyplní prázdny popis MR                 |
+| **Push events**          | Kontroluje commity pushnuté priamo do vetvy (mimo MR)                |
+| **Pipeline events**      | Analyzuje zlyhané CI/CD pipelines — nájde príčinu, navrhne opravu    |
+| **Work item events**     | Automaticky triedí nové issues — priradí labely, závažnosť a súhrn   |
+| **Deployment events**    | Analyzuje zlyhané/úspešné deploymenty, postne reporty                |
+| **Releases events**      | Generuje release notes z mergnutých MR pri vytvorení releasu         |
+| **Tag push events**      | Generuje release notes pri pushnutí nového tagu                      |
+| **Emoji events**         | Znovu spustí review, keď pridáte určitú emoji na MR                  |
+
+> **Tip:** Môžete zapnúť všetky. Bot spracuje len relevantné udalosti a zvyšok ignoruje.
+
+![Screenshot 2026-05-27 at 16.46.53.png](images/Screenshot%202026-05-27%20at%2016.46.53.png)
+
+6. Odškrtnite **Enable SSL verification** (pokiaľ nemáte HTTPS na bot-ovi).
 7. Kliknite **Add webhook**.
+![Screenshot 2026-05-27 at 19.52.43.png](images/Screenshot%202026-05-27%20at%2019.52.43.png)
 
-### Overenie ze to funguje
+### Overenie, že to funguje
 
-Po ulozeni kliknite na tlacidlo **Test** vedla vasho webhooku a vyberte **Push events**. Mali by ste vidiet zelenu odpoved `200 OK`.
+Po uložení kliknite na tlačidlo **Test** vedľa vášho webhooku a vyberte **Push events**. Mali by ste vidieť zelenú odpoveď `200 OK`.
 
-Alternativne vytvorte testovaci merge request — bot by mal pridat komentare s code review do par minut.
+Alternatívne vytvorte testovací merge request — bot by mal pridať komentáre s code review do pár minút.
 
 ---
 
 ## Krok 2: Zistenie Project ID
 
-Project ID potrebujete na nastavenie Google Chat notifikacii. Najdete ho dvoma sposobmi:
+Project ID potrebujete na nastavenie Google Chat notifikácií. Nájdete ho dvoma spôsobmi:
 
-- **Settings > General** — Project ID je zobrazeny na vrchu stranky.
-- **Hlavna stranka projektu** — zobrazuje sa pod nazvom projektu (napr. `Project ID: 34`).
+- **Settings > General** — Project ID je zobrazený na vrchu stránky.
+- **Hlavná stránka projektu** — zobrazuje sa pod názvom projektu (napr. `Project ID: 34`).
 
-Zapamatajte si toto cislo pre Krok 4.
+![Screenshot 2026-05-27 at 19.52.43.png](images/Screenshot%202026-05-27%20at%2019.52.43.png)
+
+Zapamätajte si toto číslo pre Krok 4.
 
 ---
 
 ## Krok 3: Vytvorenie Google Chat Space webhooku
 
-Toto umozni botu posielat notifikacie o review do Google Chat priestoru.
+Toto umožní botu posielať notifikácie o review do Google Chat priestoru.
 
 1. Otvorte **Google Chat** (chat.google.com).
-2. Otvorte priestor (space), kde chcete dostavat notifikacie.
-3. Kliknite na **nazov priestoru** hore pre otvorenie nastaveni.
-4. Chodte do **Manage apps & integrations** (alebo **Manage webhooks** v starsich verziach).
+2. Otvorte priestor (space), kde chcete dostávať notifikácie.
+![Screenshot 2026-05-27 at 16.51.02.png](images/Screenshot%202026-05-27%20at%2016.51.02.png)
+3. Kliknite na **názov priestoru** hore pre otvorenie nastavení.
+4. Choďte do **Manage apps & integrations** (alebo **Manage webhooks** v starších verziách).
+![Screenshot 2026-05-27 at 16.51.35.png](images/Screenshot%202026-05-27%20at%2016.51.35.png)
 5. Kliknite na **Add webhooks**.
-6. Zadajte nazov, napr. `Code Review Bot`.
-7. Volitelne nastavte URL avatara.
+![Screenshot 2026-05-27 at 16.51.53.png](images/Screenshot%202026-05-27%20at%2016.51.53.png)
+6. Zadajte názov, napr. `Code Review Bot`.
+7. Voliteľne nastavte URL avatara.
 8. Kliknite **Save**.
-9. **Skopirajte webhook URL** — vyzera takto:
+9. **Skopírujte webhook URL** — vyzerá takto:
    ```
    https://chat.googleapis.com/v1/spaces/XXXXX/messages?key=...&token=...
    ```
 
-> **Dolezite:** Tento URL obsahuje pristupove udaje. Nezdielajte ho verejne.
+> **Dôležité:** Tento URL obsahuje prístupové údaje. Nezdieľajte ho verejne.
 
 ---
 
-## Krok 4: Prepojenie Google Chat s vasim projektom (Admin UI)
+## Krok 4: Prepojenie Google Chat s vaším projektom (Admin UI)
 
-Teraz prepojte Google Chat webhook s vasim GitLab projektom v admin paneli bota.
+Teraz prepojte Google Chat webhook s vaším GitLab projektom v admin paneli bota.
 
-1. Otvorte admin rozhranie bota: `http://<BOT_IP>:8888/code-review-bot/`
-2. Prihlaste sa vasim GitLab uctom (OAuth).
-3. Chodte na **Webhooks** v navigacii.
+1. Otvorte admin rozhranie bota: `http://<BOT_IP>:port/code-review-bot/`
+![Screenshot 2026-05-27 at 16.47.48.png](images/Screenshot%202026-05-27%20at%2016.47.48.png)
+2. Prihláste sa vaším GitLab účtom (OAuth).
+3. Choďte na **Webhooks** v navigácii.
 4. Kliknite na **Add New Webhook**.
-5. Vyplnte formular:
+![Screenshot 2026-05-27 at 16.48.01.png](images/Screenshot%202026-05-27%20at%2016.48.01.png)
+5. Vyplňte formulár:
 
-| Pole                         | Hodnota                                                   |
-|------------------------------|-----------------------------------------------------------|
-| **Project ID**               | GitLab Project ID z Kroku 2 (napr. `34`)                 |
-| **Project Name**             | Volitelne — zobrazovaci nazov (napr. `web/moj-projekt`)  |
-| **Google Chat Webhook URL**  | URL, ktory ste skopirovali v Kroku 3                      |
-| **Enabled**                  | Zaskrtnite pre aktivaciu notifikacii                      |
+| Pole                        | Hodnota                                                   |
+|-----------------------------|-----------------------------------------------------------|
+| **Project ID**              | GitLab Project ID z Kroku 2 (napr. `34`)                 |
+| **Project Name**            | Voliteľne — zobrazovací názov (napr. `web/moj-projekt`)  |
+| **Google Chat Webhook URL** | URL, ktorý ste skopírovali v Kroku 3                      |
+| **Enabled**                 | Zaškrtnite pre aktiváciu notifikácií                      |
+
+![Screenshot 2026-05-27 at 16.48.19.png](images/Screenshot%202026-05-27%20at%2016.48.19.png)
 
 6. Kliknite **Create**.
-7. Kliknite **Test** pre overenie — v Google Chat priestore by sa mala zobrazit testovacia sprava.
+7. Kliknite **Test** pre overenie — v Google Chat priestore by sa mala zobraziť testovacia správa.
 
-> **Poznamka:** Projekty bez Google Chat webhooku stale dostanu review ako GitLab komentare. Chat notifikacia je volitelna.
+> **Poznámka:** Projekty bez Google Chat webhooku stále dostanú review ako GitLab komentáre. Chat notifikácia je voliteľná.
 
 ---
 
 ## Ako to funguje
 
-Po nakonfigurovani bot spracovava udalosti automaticky:
+Po nakonfigurovaní bot spracováva udalosti automaticky:
 
 ```
-GitLab udalost (push, MR, atd.)
-    |
-    v
-Bot prijme webhook ---> Stiahne kontext z GitLab API
-    |
-    v
-LLM analyzuje kod (Ollama, bezi lokalne)
-    |
-    |---> Postne zistenia ako GitLab komentare (vzdy)
-    |---> Posle Google Chat notifikaciu (ak je nastavena)
-    '---> Ulozi do databazy (historia review)
+GitLab udalosť (push, MR, atď.)
+    │
+    ▼
+Bot prijme webhook ──→ Stiahne kontext z GitLab API
+    │
+    ▼
+LLM analyzuje kód (Ollama, beží lokálne)
+    │
+    ├──→ Postne zistenia ako GitLab komentáre (vždy)
+    ├──→ Pošle Google Chat notifikáciu (ak je nastavená)
+    └──→ Uloží do databázy (história review)
 ```
 
 ---
 
-## Prehlad udalosti
+## Prehľad udalostí
 
 ### Merge Request Review
 
-- **Spusta sa pri:** MR otvoreny, znovuotvoreny alebo aktualizovany s novymi commitmi.
-- **Co robi:** AI skontroluje diff a postne detailny koment na MR.
-- **Auto-popis:** Ak je popis MR prazdny, bot ho automaticky vygeneruje z diffu.
+- **Spúšťa sa pri:** MR otvorený, znovuotvorený alebo aktualizovaný s novými commitmi.
+- **Čo robí:** AI skontroluje diff a postne detailný komentár na MR.
+- **Auto-popis:** Ak je popis MR prázdny, bot ho automaticky vygeneruje z diffu.
 
 ### Push Review
 
-- **Spusta sa pri:** Commity pushnute priamo do vetvy (mimo MR).
-- **Co robi:** Skontroluje pushnute commity a postne koment na posledny commit.
+- **Spúšťa sa pri:** Commity pushnuté priamo do vetvy (mimo MR).
+- **Čo robí:** Skontroluje pushnuté commity a postne komentár na posledný commit.
 
-### Analyza zlyhania Pipeline
+### Analýza zlyhania Pipeline
 
-- **Spusta sa pri:** CI/CD pipeline zlyhala.
-- **Co robi:** Stiahne logy zlyhaneho jobu, najde pricinu a navrhne opravu.
-- **Poznamka:** Uspesne pipelines su ignorovane — analyzuju sa len zlyhania.
+- **Spúšťa sa pri:** CI/CD pipeline zlyhala.
+- **Čo robí:** Stiahne logy zlyhého jobu, nájde príčinu a navrhne opravu.
+- **Poznámka:** Úspešné pipelines sú ignorované — analyzujú sa len zlyhania.
 
-### Triaz Issues
+### Triaž Issues
 
-- **Spusta sa pri:** Vytvoreny novy issue.
-- **Co robi:** Klasifikuje issue, navrhne labely a zavaznost, postne sumarny koment.
+- **Spúšťa sa pri:** Vytvorený nový issue.
+- **Čo robí:** Klasifikuje issue, navrhne labely a závažnosť, postne súhrnný komentár.
 
-### Analyza Deploymentu
+### Analýza Deploymentu
 
-- **Spusta sa pri:** Deployment uspel alebo zlyhal.
-- **Co robi:** Analyzuje deployment a postne report na suvisiacom commite.
+- **Spúšťa sa pri:** Deployment uspel alebo zlyhal.
+- **Čo robí:** Analyzuje deployment a postne report na súvisiacom commite.
 
 ### Release Notes
 
-- **Spusta sa pri:** Vytvoreny release alebo pushnuty novy tag.
-- **Co robi:** Zozbiera mergnute MR od posledneho releasu a vygeneruje changelog.
+- **Spúšťa sa pri:** Vytvorený release alebo pushnutý nový tag.
+- **Čo robí:** Zozbiera mergnuté MR od posledného releasu a vygeneruje changelog.
 
 ### Emoji Re-trigger
 
-- **Spusta sa pri:** Niekto prida nakonfigurovanu emoji (predvolene: :repeat: ) na MR.
-- **Co robi:** Znovu spusti code review na danom MR.
-- **Nastavenie:** Uistite sa, ze **Emoji events** je zapnuty vo vasich GitLab webhook triggeroch.
-- **Pouzitie:** Otvorte MR, kliknite na vyber emoji a pridajte :repeat: emoji.
+- **Spúšťa sa pri:** Niekto pridá nakonfigurovanú emoji (predvolene: `:repeat:`) na MR.
+- **Čo robí:** Znovu spustí code review na danom MR.
+- **Nastavenie:** Uistite sa, že **Emoji events** je zapnutý vo vašich GitLab webhook triggeroch.
+- **Použitie:** Otvorte MR, kliknite na výber emoji a pridajte `:repeat:` emoji.
 
 ---
 
-## Sprava webhookov
+## Správa webhookov
 
-V admin rozhrani (`/code-review-bot/webhooks`) mozete:
+V admin rozhraní (`/code-review-bot/webhooks`) môžete:
 
-| Akcia          | Popis                                                    |
-|----------------|----------------------------------------------------------|
-| **Create**     | Pridat novy projekt s Google Chat webhook URL             |
-| **Edit**       | Zmenit webhook URL alebo nazov projektu                   |
-| **Toggle**     | Zapnut/vypnut notifikacie bez vymazania konfiguracie      |
-| **Test**       | Poslat testovaciu spravu pre overenie Google Chat spojenia |
-| **Delete**     | Uplne odstranit konfiguraciu webhooku                     |
+| Akcia      | Popis                                                      |
+|------------|------------------------------------------------------------|
+| **Create** | Pridať nový projekt s Google Chat webhook URL              |
+| **Edit**   | Zmeniť webhook URL alebo názov projektu                    |
+| **Toggle** | Zapnúť/vypnúť notifikácie bez vymazania konfigurácie       |
+| **Test**   | Poslať testovaciu správu pre overenie Google Chat spojenia |
+| **Delete** | Úplne odstrániť konfiguráciu webhooku                      |
 
 ---
 
-## Riesenie problemov
+## Riešenie problémov
 
-### Bot nereaguje na moj merge request
+### Bot nereaguje na môj merge request
 
-1. Skontrolujte ci je GitLab webhook spravne nakonfigurovany:
-   - Chodte do **Project > Settings > Webhooks > Edit > Recent deliveries**.
-   - Hladajte odpoved `200 OK`.
-2. Ak vidite `401`, secret token sa nezhoduje.
-3. Ak vidite chybu spojenia, bot je nedostupny — skontrolujte URL a firewall.
+1. Skontrolujte, či je GitLab webhook správne nakonfigurovaný:
+   - Choďte do **Project > Settings > Webhooks > Edit > Recent deliveries**.
+   - Hľadajte odpoveď `200 OK`.
+2. Ak vidíte `401`, secret token sa nezhoduje.
+3. Ak vidíte chybu spojenia, bot je nedostupný — skontrolujte URL a firewall.
 
 ### Review je na GitLabe, ale nie v Google Chate
 
-1. Otvorte admin rozhranie a skontrolujte, ci je webhook nakonfigurovany pre vas Project ID.
-2. Uistite sa, ze webhook je **Enabled** (zeleny stav).
-3. Kliknite **Test** — ak zlyhava, Google Chat webhook URL mohol exspirovat. Vytvorte novy v Google Chat a aktualizujte ho.
+1. Otvorte admin rozhranie a skontrolujte, či je webhook nakonfigurovaný pre váš Project ID.
+2. Uistite sa, že webhook je **Enabled** (zelený stav).
+3. Kliknite **Test** — ak zlyháva, Google Chat webhook URL mohol exspirovať. Vytvorte nový v Google Chat a aktualizujte ho.
 
 ### Bot ignoruje moje push eventy
 
-- Uistite sa, ze **Push events** je zapnuty v GitLab webhook triggeroch.
-- Bot kontroluje len pushy, ktore obsahuju commity — prazdne pushy (napr. zmazanie vetvy) su ignorovane.
+- Uistite sa, že **Push events** je zapnutý v GitLab webhook triggeroch.
+- Bot kontroluje len pushy, ktoré obsahujú commity — prázdne pushy (napr. zmazanie vetvy) sú ignorované.
 
 ### Bot ignoruje pipeline eventy
 
-- Uistite sa, ze **Pipeline events** je zapnuty v GitLab webhook triggeroch.
-- Bot analyzuje len **zlyhane** pipelines. Uspesne pipelines su zamerne ignorovane.
+- Uistite sa, že **Pipeline events** je zapnutý v GitLab webhook triggeroch.
+- Bot analyzuje len **zlyhané** pipelines. Úspešné pipelines sú zámerne ignorované.
 
-### Chcem znovu spustit review
+### Chcem znovu spustiť review
 
-Pridajte :repeat: emoji na MR. Uistite sa, ze **Emoji events** je zapnuty v GitLab webhook triggeroch.
+Pridajte `:repeat:` emoji na MR. Uistite sa, že **Emoji events** je zapnutý v GitLab webhook triggeroch.
 
-### Velky MR trva prilis dlho / vyprsi cas
+### Veľký MR trvá príliš dlho / vyprší čas
 
-LLM potrebuje cas na velke diffy. Mozete:
-- Zvysit `OLLAMA_TIMEOUT_S` v `.env` (predvolene: 1800 sekund = 30 minut).
-- Pouzit mensi/rychlejsi model (zmenit `OLLAMA_MODEL` v `.env`).
-- Znizit `MAX_CHUNK_CHARS` pre posielanie mensich casti do LLM.
+LLM potrebuje čas na veľké diffy. Môžete:
+- Zvýšiť `OLLAMA_TIMEOUT_S` v `.env` (predvolene: 1800 sekúnd = 30 minút).
+- Použiť menší/rýchlejší model (zmeniť `OLLAMA_MODEL` v `.env`).
+- Znížiť `MAX_CHUNK_CHARS` pre posielanie menších častí do LLM.
