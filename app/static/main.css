@@ -290,3 +290,191 @@ nav .brand {
     margin-top: 1.5rem;
     flex-wrap: wrap;
 }
+
+/* === Model combobox === */
+
+.combobox {
+    position: relative;
+    margin-bottom: var(--pico-spacing);
+}
+
+.combobox-field {
+    display: flex;
+    align-items: stretch;
+    border: 1px solid var(--pico-form-element-border-color);
+    border-radius: var(--pico-border-radius);
+    background: var(--pico-form-element-background-color);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.combobox-field:focus-within {
+    border-color: var(--pico-primary);
+    box-shadow: 0 0 0 0.125rem color-mix(in srgb, var(--pico-primary) 22%, transparent);
+}
+
+.combobox-input.combobox-input {
+    flex: 1 1 auto;
+    width: 100%;
+    margin: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    font-family: var(--pico-font-family-monospace);
+    font-size: 0.88rem;
+}
+
+.combobox-input:focus {
+    outline: none;
+}
+
+.combobox-toggle {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    padding: 0 0.7rem;
+    margin: 0;
+    width: auto;
+    background: none;
+    border: none;
+    border-left: 1px solid var(--pico-form-element-border-color);
+    color: var(--pico-muted-color);
+    cursor: pointer;
+    transition: color 0.15s ease;
+}
+
+.combobox-toggle:hover {
+    color: var(--pico-primary);
+}
+
+.combobox-toggle svg {
+    width: 18px;
+    height: 18px;
+    transition: transform 0.2s ease;
+}
+
+.combobox[data-open] .combobox-toggle svg {
+    transform: rotate(180deg);
+}
+
+.combobox-panel {
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 0.35rem);
+    left: 0;
+    right: 0;
+    background: var(--pico-card-background-color);
+    border: 1px solid var(--pico-muted-border-color);
+    border-radius: var(--pico-border-radius);
+    box-shadow: 0 14px 32px -10px rgba(0, 0, 0, 0.28);
+    overflow: hidden;
+    animation: combobox-in 0.14s ease-out;
+}
+
+@keyframes combobox-in {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.combobox-panel-header {
+    padding: 0.5rem 0.85rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--pico-muted-color);
+    border-bottom: 1px solid var(--pico-muted-border-color);
+}
+
+.combobox-list {
+    list-style: none;
+    margin: 0;
+    padding: 0.3rem;
+    max-height: 264px;
+    overflow-y: auto;
+}
+
+.combobox-option {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.6rem;
+    border-radius: calc(var(--pico-border-radius) - 1px);
+    cursor: pointer;
+}
+
+.combobox-option:hover,
+.combobox-option[data-active] {
+    background: color-mix(in srgb, var(--pico-primary) 11%, transparent);
+}
+
+.combobox-option-icon {
+    flex: 0 0 auto;
+    color: var(--pico-primary);
+    opacity: 0.85;
+}
+
+.combobox-option-name {
+    font-family: var(--pico-font-family-monospace);
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.combobox-option-tag {
+    font-family: var(--pico-font-family-monospace);
+    font-size: 0.7rem;
+    color: var(--pico-muted-color);
+    background: color-mix(in srgb, var(--pico-muted-color) 16%, transparent);
+    padding: 0.1rem 0.45rem;
+    border-radius: 1rem;
+    white-space: nowrap;
+}
+
+.combobox-check {
+    flex: 0 0 auto;
+    margin-left: auto;
+    color: var(--pico-primary);
+    opacity: 0;
+    transition: opacity 0.12s ease;
+}
+
+.combobox-option[aria-selected="true"] .combobox-check {
+    opacity: 1;
+}
+
+.combobox-empty {
+    padding: 1rem 0.85rem;
+    color: var(--pico-muted-color);
+    font-size: 0.82rem;
+    text-align: center;
+}
+
+.combobox-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-top: 0.4rem;
+    padding: 0.12rem 0.55rem;
+    border-radius: 1rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+.combobox-status:empty {
+    display: none;
+}
+
+.combobox-status[data-state="installed"] {
+    background: #d4edda;
+    color: #155724;
+}
+
+.combobox-status[data-state="custom"] {
+    background: #fff3cd;
+    color: #856404;
+}
