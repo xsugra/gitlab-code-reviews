@@ -1,9 +1,9 @@
 import logging
 import time
 
-from .. import config, llm_client, prompts
+from .. import db, llm_client, prompts, settings
 from ..gitlab_client import GitLabClient
-from ..reviewer import split_diffs
+from ..reviewer import filter_ignored_diffs, split_diffs
 from ._common import notify_and_save
 
 log = logging.getLogger(__name__)
@@ -12,7 +12,7 @@ log = logging.getLogger(__name__)
 def _format_commit_block(commit: dict, diffs: list[dict]) -> str:
     sha = commit.get("id", "")[:8]
     message = commit.get("message") or commit.get("title") or ""
-    chunks = split_diffs(diffs, config.MAX_CHUNK_CHARS)
+    chunks = split_diffs(diffs, settings.get("MAX_CHUNK_CHARS"))
     diff_text = "\n\n".join(chunks) if chunks else "(no diff)"
     return f"#### Commit `{sha}`: {message.strip()}\n{diff_text}"
 
@@ -36,11 +36,16 @@ async def handle_push(payload: dict) -> None:
 
     async with GitLabClient() as gl:
         commit_blocks: list[str] = []
+
+        webhook_config = await db.get_webhook_config(project_id)
+        model = (webhook_config or {}).get("model") or settings.get("OLLAMA_MODEL")
         for c in commits:
             sha = c.get("id", "")
             log.info("  Fetching diff for commit %s...", sha[:8])
             try:
                 diffs = await gl.get_commit_diff(project_id, sha)
+                ignore_patterns = (webhook_config or {}).get("ignore_patterns", "")
+                diffs = filter_ignored_diffs(diffs, ignore_patterns)
                 commit_blocks.append(_format_commit_block(c, diffs))
             except Exception:
                 log.exception("  Failed to fetch diff for commit %s", sha[:8])
@@ -56,7 +61,7 @@ async def handle_push(payload: dict) -> None:
                 {"role": "user", "content": prompts.PUSH_REVIEW_PROMPT.format(
                     branch=branch, commits_block=commits_block,
                 )},
-            ])
+            ], model=model)
         except Exception:
             log.exception("  LLM review failed")
             return
@@ -66,7 +71,7 @@ async def handle_push(payload: dict) -> None:
             f"## Push Review — `{branch}`\n\n"
             f"{review}\n\n"
             f"---\n"
-            f"_Reviewed by `{config.OLLAMA_MODEL}` — {len(commits)} commit(s)._"
+            f"_Reviewed by `{model}` — {len(commits)} commit(s)._"
         )
 
         last_sha = commits[-1].get("id", "")
@@ -81,7 +86,7 @@ async def handle_push(payload: dict) -> None:
     await notify_and_save(
         event_type="push_review", project_id=project_id, project_name=project_name,
         title=f"Push to {branch} ({len(commits)} commit(s))",
-        url=ref_url, result_text=review, ref_id=last_sha[:8],
+        url=ref_url, result_text=review, ref_id=last_sha[:8], model=model,
     )
 
     log.info("========== PUSH REVIEW DONE in %.1fs ==========", time.monotonic() - t_start)

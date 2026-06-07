@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
 
-from . import config, db, google_chat
+from . import config, db, google_chat, settings
 
 log = logging.getLogger(__name__)
 
@@ -88,12 +88,7 @@ SESSION_MAX_AGE = 28800
 
 
 def _admin_enabled() -> bool:
-    return bool(
-        config.GITLAB_OAUTH_APP_ID
-        and config.GITLAB_OAUTH_APP_SECRET
-        and config.SESSION_SECRET
-        and config.ADMIN_BASE_URL
-    )
+    return bool(config.SESSION_SECRET and config.ADMIN_PASSWORD)
 
 
 def _sign(payload: bytes) -> str:
@@ -159,94 +154,36 @@ def _mask_url(url: str) -> str:
     return url[:20] + "..." + url[-12:]
 
 
-def _oauth_authorize_url(state: str) -> str:
-    base = config.GITLAB_OAUTH_BASE_URL.rstrip("/")
-    redirect_uri = f"{config.ADMIN_BASE_URL.rstrip('/')}/code-review-bot/callback"
-    return (
-        f"{base}/oauth/authorize"
-        f"?client_id={config.GITLAB_OAUTH_APP_ID}"
-        f"&redirect_uri={redirect_uri}"
-        f"&response_type=code"
-        f"&scope=read_user"
-        f"&state={state}"
-    )
-
-
-async def _exchange_code(code: str) -> dict:
-    base = config.GITLAB_URL.rstrip("/")
-    redirect_uri = f"{config.ADMIN_BASE_URL.rstrip('/')}/code-review-bot/callback"
-    async with httpx.AsyncClient(timeout=15) as c:
-        r = await c.post(
-            f"{base}/oauth/token",
-            data={
-                "client_id": config.GITLAB_OAUTH_APP_ID,
-                "client_secret": config.GITLAB_OAUTH_APP_SECRET,
-                "code": code,
-                "grant_type": "authorization_code",
-                "redirect_uri": redirect_uri,
-            },
-        )
-        r.raise_for_status()
-        return r.json()
-
-
-async def _get_gitlab_user(access_token: str) -> dict:
-    base = config.GITLAB_URL.rstrip("/")
-    async with httpx.AsyncClient(timeout=15) as c:
-        r = await c.get(
-            f"{base}/api/v4/user",
-            headers={"Authorization": f"Bearer {access_token}"},
-        )
-        r.raise_for_status()
-        return r.json()
-
-
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     if not _admin_enabled():
         raise HTTPException(
             status_code=503,
-            detail="Admin UI is not configured. Set GITLAB_OAUTH_APP_ID, GITLAB_OAUTH_APP_SECRET, SESSION_SECRET, and ADMIN_BASE_URL.",
+            detail="Admin UI is not configured. Set SESSION_SECRET and ADMIN_PASSWORD in the environment.",
         )
     session = _get_session(request)
     if session:
         return RedirectResponse("/code-review-bot/", status_code=303)
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse("login.html", {"request": request, "error": None})
 
 
-@router.get("/callback")
-async def oauth_callback(request: Request, code: str = "", state: str = "", error: str = "",
-                         error_description: str = ""):
-    if error:
-        log.warning("OAuth error from GitLab: %s — %s", error, error_description)
-        raise HTTPException(status_code=400, detail=f"GitLab OAuth error: {error} — {error_description}")
-    if not code:
-        params = dict(request.query_params)
-        log.warning("OAuth callback without code. Query params: %s", params)
-        raise HTTPException(status_code=400, detail=f"Missing authorization code. GitLab returned: {params}")
+@router.post("/login", response_class=HTMLResponse)
+async def login(request: Request, password: str = Form(...)):
+    if not _admin_enabled():
+        raise HTTPException(
+            status_code=503,
+            detail="Admin UI is not configured. Set SESSION_SECRET and ADMIN_PASSWORD in the environment.",
+        )
 
-    expected_state = request.cookies.get("oauth_state", "")
-    if not state or not expected_state or not hmac.compare_digest(state, expected_state):
-        raise HTTPException(status_code=400, detail="Invalid OAuth state")
+    if not hmac.compare_digest(password, config.ADMIN_PASSWORD):
+        log.warning("Failed login attempt")
+        return templates.TemplateResponse(
+            "login.html",
+            {"request": request, "error": "Incorrect password."},
+            status_code=401,
+        )
 
-    try:
-        token_data = await _exchange_code(code)
-        access_token = token_data["access_token"]
-        user = await _get_gitlab_user(access_token)
-    except httpx.HTTPStatusError:
-        log.exception("OAuth token exchange failed")
-        raise HTTPException(status_code=401, detail="GitLab authentication failed")
-    except Exception:
-        log.exception("OAuth callback error")
-        raise HTTPException(status_code=500, detail="Authentication error")
-
-    session_data = {
-        "username": user.get("username", "unknown"),
-        "name": user.get("name", ""),
-        "avatar_url": user.get("avatar_url", ""),
-    }
-    session_token = _create_session(session_data)
-
+    session_token = _create_session({"username": "admin"})
     response = RedirectResponse("/code-review-bot/", status_code=303)
     response.set_cookie(
         SESSION_COOKIE,
@@ -255,18 +192,7 @@ async def oauth_callback(request: Request, code: str = "", state: str = "", erro
         httponly=True,
         samesite="lax",
     )
-    response.delete_cookie("oauth_state")
-    log.info("User '%s' logged in", session_data["username"])
-    return response
-
-
-@router.get("/start-oauth")
-async def start_oauth(request: Request):
-    state = secrets.token_hex(32)
-    url = _oauth_authorize_url(state)
-    log.info("OAuth redirect URL: %s", url)
-    response = RedirectResponse(url, status_code=303)
-    response.set_cookie("oauth_state", state, max_age=600, httponly=True, samesite="lax")
+    log.info("Admin logged in")
     return response
 
 
@@ -299,7 +225,7 @@ async def dashboard(request: Request):
         "reviews": reviews,
         "webhooks": webhooks,
         "health": health,
-        "model": config.OLLAMA_MODEL,
+        "model": settings.get("OLLAMA_MODEL"),
     })
 
 
@@ -315,15 +241,22 @@ async def list_webhooks(request: Request):
     })
 
 
-@router.get("/webhooks/new", response_class=HTMLResponse)
-async def new_webhook_form(request: Request):
-    session = _require_session(request)
+async def _webhook_form_response(request: Request, session: dict, config, error: str | None,
+                                 status_code: int = 200) -> HTMLResponse:
     return templates.TemplateResponse("webhooks/form.html", {
         "request": request,
         "session": session,
-        "config": None,
-        "error": None,
-    })
+        "config": config,
+        "error": error,
+        "installed_models": await _installed_ollama_models(),
+        "default_model": settings.get("OLLAMA_MODEL"),
+    }, status_code=status_code)
+
+
+@router.get("/webhooks/new", response_class=HTMLResponse)
+async def new_webhook_form(request: Request):
+    session = _require_session(request)
+    return await _webhook_form_response(request, session, None, None)
 
 
 @router.post("/webhooks", response_class=HTMLResponse)
@@ -334,36 +267,29 @@ async def create_webhook(
         webhook_url: str = Form(...),
         enabled: bool = Form(False),
         csrf_token: str = Form(...),
+        ignore_patterns: str = Form(""),
+        model: str = Form(""),
 ):
     session = _require_session(request)
     _validate_csrf(csrf_token, session)
 
     if project_id < 1:
-        return templates.TemplateResponse("webhooks/form.html", {
-            "request": request,
-            "session": session,
-            "config": None,
-            "error": "Project ID must be a positive integer.",
-        })
+        return await _webhook_form_response(request, session, None,
+                                            "Project ID must be a positive integer.", 400)
 
     if not webhook_url.startswith("https://"):
-        return templates.TemplateResponse("webhooks/form.html", {
-            "request": request,
-            "session": session,
-            "config": None,
-            "error": "Webhook URL must start with https://",
-        })
+        return await _webhook_form_response(request, session, None,
+                                            "Webhook URL must start with https://", 400)
 
     existing = await db.get_webhook_config(project_id)
     if existing:
-        return templates.TemplateResponse("webhooks/form.html", {
-            "request": request,
-            "session": session,
-            "config": None,
-            "error": f"A webhook is already configured for project ID {project_id}. Edit it instead.",
-        })
+        return await _webhook_form_response(
+            request, session, None,
+            f"A webhook is already configured for project ID {project_id}. Edit it instead.", 400)
 
-    await db.save_webhook_config(project_id, project_name, webhook_url, enabled, created_by=session.get("username", ""))
+    await db.save_webhook_config(project_id, project_name, webhook_url, enabled,
+                                 ignore_patterns=ignore_patterns, model=model,
+                                 created_by=session.get("username", ""))
     log.info("Webhook config created for project %s by %s", project_id, session.get("username"))
     return RedirectResponse("/code-review-bot/webhooks", status_code=303)
 
@@ -374,12 +300,7 @@ async def edit_webhook_form(request: Request, config_id: int):
     cfg = await db.get_webhook_config_by_id(config_id)
     if not cfg:
         raise HTTPException(status_code=404, detail="Webhook config not found")
-    return templates.TemplateResponse("webhooks/form.html", {
-        "request": request,
-        "session": session,
-        "config": cfg,
-        "error": None,
-    })
+    return await _webhook_form_response(request, session, cfg, None)
 
 
 @router.post("/webhooks/{config_id:int}", response_class=HTMLResponse)
@@ -390,6 +311,8 @@ async def update_webhook(
         webhook_url: str = Form(...),
         enabled: bool = Form(False),
         csrf_token: str = Form(...),
+        ignore_patterns: str = Form(""),
+        model: str = Form(""),
 ):
     session = _require_session(request)
     _validate_csrf(csrf_token, session)
@@ -399,12 +322,8 @@ async def update_webhook(
         raise HTTPException(status_code=404, detail="Webhook config not found")
 
     if not webhook_url.startswith("https://"):
-        return templates.TemplateResponse("webhooks/form.html", {
-            "request": request,
-            "session": session,
-            "config": cfg,
-            "error": "Webhook URL must start with https://",
-        })
+        return await _webhook_form_response(request, session, cfg,
+                                            "Webhook URL must start with https://", 400)
 
     await db.update_webhook_config(
         config_id,
@@ -412,6 +331,8 @@ async def update_webhook(
         webhook_url=webhook_url,
         enabled=enabled,
         updated_by=session.get("username", ""),
+        ignore_patterns=ignore_patterns,
+        model=model,
     )
     log.info("Webhook config %s updated by %s", config_id, session.get("username"))
     return RedirectResponse("/code-review-bot/webhooks", status_code=303)
@@ -525,8 +446,109 @@ async def health_page(request: Request):
         "webhook_count": webhook_count,
     })
 
-def _get_session(request: Request) -> dict | None:
-    token = request.cookies.get("session")
-    if not token:
-        return None
-    return _verify_session(token)
+
+# ── Settings ─────────────────────────────────────────────────────
+
+async def _installed_ollama_models() -> list[str]:
+    """List models currently pulled in Ollama, for the model dropdown."""
+    try:
+        async with httpx.AsyncClient(timeout=10) as c:
+            r = await c.get(f"{settings.get('OLLAMA_URL')}/api/tags")
+            r.raise_for_status()
+            return sorted(m["name"] for m in r.json().get("models", []))
+    except Exception:
+        log.warning("Could not list Ollama models for settings form")
+        return []
+
+
+def _grouped_fields() -> dict[str, list[dict]]:
+    """Schema fields grouped by section, each with its current value filled in."""
+    groups: dict[str, list[dict]] = {}
+    for field in settings.SETTINGS_SCHEMA:
+        item = dict(field, value=settings.get_raw(field["key"]))
+        groups.setdefault(field["group"], []).append(item)
+    return groups
+
+
+@router.get("/settings", response_class=HTMLResponse)
+async def settings_page(request: Request):
+    session = _require_session(request)
+    return templates.TemplateResponse("settings.html", {
+        "request": request,
+        "session": session,
+        "groups": _grouped_fields(),
+        "installed_models": await _installed_ollama_models(),
+        "error": None,
+    })
+
+
+@router.post("/settings", response_class=HTMLResponse)
+async def update_settings(request: Request):
+    session = _require_session(request)
+    form = await request.form()
+    _validate_csrf(form.get("csrf_token", ""), session)
+
+    values: dict[str, str] = {}
+    for field in settings.SETTINGS_SCHEMA:
+        key = field["key"]
+        if key not in form:
+            continue
+        raw = (form.get(key) or "").strip()
+        if raw and field["type"] in ("int", "float"):
+            try:
+                number = int(raw) if field["type"] == "int" else float(raw)
+                if number <= 0:
+                    raise ValueError
+            except ValueError:
+                return templates.TemplateResponse("settings.html", {
+                    "request": request,
+                    "session": session,
+                    "groups": _grouped_fields(),
+                    "installed_models": await _installed_ollama_models(),
+                    "error": f"'{field['label']}' must be a positive number.",
+                }, status_code=400)
+        values[key] = raw
+
+    await settings.save(values)
+    log.info("Settings updated by %s", session.get("username"))
+    return RedirectResponse("/code-review-bot/settings", status_code=303)
+
+
+@router.post("/settings/test/{target}")
+async def test_settings_connection(request: Request, target: str, csrf_token: str = Form(...)):
+    session = _require_session(request)
+    _validate_csrf(csrf_token, session)
+
+    if target == "ollama":
+        try:
+            async with httpx.AsyncClient(timeout=10) as c:
+                r = await c.get(f"{settings.get('OLLAMA_URL')}/api/tags")
+                r.raise_for_status()
+            ok, detail = True, "Ollama reachable."
+        except Exception as e:
+            ok, detail = False, str(e)
+    elif target == "gitlab":
+        try:
+            async with httpx.AsyncClient(timeout=10) as c:
+                r = await c.get(
+                    f"{settings.get('GITLAB_URL').rstrip('/')}/api/v4/version",
+                    headers={"PRIVATE-TOKEN": settings.get("GITLAB_TOKEN")},
+                )
+                r.raise_for_status()
+            ok, detail = True, "GitLab reachable and token valid."
+        except httpx.HTTPStatusError as e:
+            ok, detail = False, f"HTTP {e.response.status_code} — check the URL and token."
+        except Exception as e:
+            ok, detail = False, str(e)
+    else:
+        raise HTTPException(status_code=404, detail="Unknown test target")
+
+    return templates.TemplateResponse("settings.html", {
+        "request": request,
+        "session": session,
+        "groups": _grouped_fields(),
+        "installed_models": await _installed_ollama_models(),
+        "error": None,
+        "flash": f"{target.title()}: {detail}",
+        "flash_type": "success" if ok else "error",
+    })
