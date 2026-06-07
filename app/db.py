@@ -9,58 +9,168 @@ log = logging.getLogger(__name__)
 DB_PATH = os.getenv("DB_PATH", "/data/reviews.db")
 
 _SCHEMA = """
-CREATE TABLE IF NOT EXISTS reviews (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    project_id INTEGER NOT NULL,
-    project_name TEXT NOT NULL,
-    mr_iid INTEGER NOT NULL,
-    mr_title TEXT,
-    mr_url TEXT,
-    model TEXT NOT NULL,
-    chunks_count INTEGER NOT NULL,
-    review_text TEXT NOT NULL,
-    created_at TEXT NOT NULL
-);
+          CREATE TABLE IF NOT EXISTS reviews
+          (
+              id
+              INTEGER
+              PRIMARY
+              KEY
+              AUTOINCREMENT,
+              project_id
+              INTEGER
+              NOT
+              NULL,
+              project_name
+              TEXT
+              NOT
+              NULL,
+              mr_iid
+              INTEGER
+              NOT
+              NULL,
+              mr_title
+              TEXT,
+              mr_url
+              TEXT,
+              model
+              TEXT
+              NOT
+              NULL,
+              chunks_count
+              INTEGER
+              NOT
+              NULL,
+              review_text
+              TEXT
+              NOT
+              NULL,
+              created_at
+              TEXT
+              NOT
+              NULL
+          );
 
-CREATE INDEX IF NOT EXISTS idx_reviews_project_mr ON reviews(project_id, mr_iid);
-CREATE INDEX IF NOT EXISTS idx_reviews_created ON reviews(created_at);
+          CREATE INDEX IF NOT EXISTS idx_reviews_project_mr ON reviews(project_id, mr_iid);
+          CREATE INDEX IF NOT EXISTS idx_reviews_created ON reviews(created_at);
 
-CREATE TABLE IF NOT EXISTS webhook_configs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    project_id INTEGER NOT NULL UNIQUE,
-    project_name TEXT NOT NULL DEFAULT '',
-    webhook_url TEXT NOT NULL,
-    enabled INTEGER NOT NULL DEFAULT 1,
-    created_by TEXT NOT NULL DEFAULT '',
-    updated_by TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-);
+          CREATE TABLE IF NOT EXISTS webhook_configs
+          (
+              id
+              INTEGER
+              PRIMARY
+              KEY
+              AUTOINCREMENT,
+              project_id
+              INTEGER
+              NOT
+              NULL
+              UNIQUE,
+              project_name
+              TEXT
+              NOT
+              NULL
+              DEFAULT
+              '',
+              webhook_url
+              TEXT
+              NOT
+              NULL,
+              enabled
+              INTEGER
+              NOT
+              NULL
+              DEFAULT
+              1,
+              ignore_patterns
+              TEXT
+              NOT
+              NULL
+              DEFAULT
+              '',
+              model
+              TEXT
+              NOT
+              NULL
+              DEFAULT
+              '',
+              created_by
+              TEXT
+              NOT
+              NULL
+              DEFAULT
+              '',
+              updated_by
+              TEXT
+              NOT
+              NULL
+              DEFAULT
+              '',
+              created_at
+              TEXT
+              NOT
+              NULL,
+              updated_at
+              TEXT
+              NOT
+              NULL
+          );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_webhook_configs_project
-    ON webhook_configs(project_id);
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_webhook_configs_project
+              ON webhook_configs(project_id);
 
-CREATE TABLE IF NOT EXISTS events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    event_type TEXT NOT NULL,
-    project_id INTEGER NOT NULL,
-    project_name TEXT NOT NULL,
-    ref_id TEXT,
-    ref_url TEXT,
-    model TEXT NOT NULL,
-    result_text TEXT NOT NULL,
-    created_at TEXT NOT NULL
-);
+          CREATE TABLE IF NOT EXISTS events
+          (
+              id
+              INTEGER
+              PRIMARY
+              KEY
+              AUTOINCREMENT,
+              event_type
+              TEXT
+              NOT
+              NULL,
+              project_id
+              INTEGER
+              NOT
+              NULL,
+              project_name
+              TEXT
+              NOT
+              NULL,
+              ref_id
+              TEXT,
+              ref_url
+              TEXT,
+              model
+              TEXT
+              NOT
+              NULL,
+              result_text
+              TEXT
+              NOT
+              NULL,
+              created_at
+              TEXT
+              NOT
+              NULL
+          );
 
-CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type);
-CREATE INDEX IF NOT EXISTS idx_events_project ON events(project_id);
-CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at);
-"""
+          CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type);
+          CREATE INDEX IF NOT EXISTS idx_events_project ON events(project_id);
+          CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at);
 
+          CREATE TABLE IF NOT EXISTS app_settings
+          (
+              key   TEXT PRIMARY KEY,
+              value TEXT NOT NULL DEFAULT ''
+          ); \
+          """
 
 _MIGRATIONS = [
     "ALTER TABLE webhook_configs ADD COLUMN created_by TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE webhook_configs ADD COLUMN updated_by TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE webhook_configs ADD COLUMN ignore_patterns TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE webhook_configs ADD COLUMN model TEXT NOT NULL DEFAULT ''",
 ]
 
 
@@ -152,21 +262,25 @@ async def get_all_webhook_configs() -> list[dict]:
 async def save_webhook_config(
         project_id: int, project_name: str, webhook_url: str, enabled: bool = True,
         created_by: str = "",
+        ignore_patterns: str = "",
+        model: str = "",
 ) -> int:
     now = datetime.now(timezone.utc).isoformat()
     async with aiosqlite.connect(DB_PATH) as conn:
         cursor = await conn.execute(
             """INSERT INTO webhook_configs
-               (project_id, project_name, webhook_url, enabled, created_by, updated_by, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (project_id, project_name, webhook_url, int(enabled), created_by, created_by, now, now),
+               (project_id, project_name, webhook_url, enabled, ignore_patterns, model, created_by, updated_by,
+                created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (project_id, project_name, webhook_url, int(enabled), ignore_patterns, model, created_by, created_by,
+             now, now),
         )
         await conn.commit()
         return cursor.lastrowid
 
 
 async def update_webhook_config(config_id: int, **fields) -> None:
-    allowed = {"project_name", "webhook_url", "enabled", "updated_by"}
+    allowed = {"project_name", "webhook_url", "enabled", "updated_by", "ignore_patterns", "model"}
     updates = {k: v for k, v in fields.items() if k in allowed}
     if not updates:
         return
@@ -227,3 +341,25 @@ async def get_events(event_type: str | None = None, project_id: int | None = Non
         cursor = await conn.execute(query, params)
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
+
+
+# ── App settings ─────────────────────────────────────────────────
+
+async def get_all_settings() -> dict[str, str]:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        cursor = await conn.execute("SELECT key, value FROM app_settings")
+        rows = await cursor.fetchall()
+        return {key: value for key, value in rows}
+
+
+async def set_settings(values: dict[str, str]) -> None:
+    if not values:
+        return
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.executemany(
+            """INSERT INTO app_settings (key, value)
+               VALUES (?, ?)
+               ON CONFLICT(key) DO UPDATE SET value = excluded.value""",
+            [(k, v) for k, v in values.items()],
+        )
+        await conn.commit()

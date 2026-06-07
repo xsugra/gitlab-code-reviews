@@ -1,7 +1,8 @@
 import logging
 import time
+import fnmatch
 
-from . import config, db, google_chat, llm_client, prompts
+from . import db, google_chat, llm_client, prompts, settings
 from .gitlab_client import GitLabClient
 
 log = logging.getLogger(__name__)
@@ -25,6 +26,14 @@ def _split_diff_by_hunks(diff_text: str) -> list[str]:
 
 def _format_file_block(path: str, diff_text: str) -> str:
     return f"### {path}\n```diff\n{diff_text}\n```\n"
+
+
+def filter_ignored_diffs(diffs: list[dict], patterns: str) -> list[dict]:
+    if not patterns.strip():
+        return diffs
+    rules = [p.strip() for p in patterns.splitlines() if p.strip() and not p.strip().startswith("#")]
+    return [d for d in diffs if
+            not any(fnmatch.fnmatch(d.get("new_path") or d.get("old_path") or "", rule) for rule in rules)]
 
 
 def split_diffs(diffs: list[dict], max_chars: int) -> list[str]:
@@ -75,16 +84,17 @@ def split_diffs(diffs: list[dict], max_chars: int) -> list[str]:
     return chunks
 
 
-async def _review_chunk(title: str, diff_block: str) -> str:
+async def _review_chunk(title: str, diff_block: str, model: str) -> str:
     return await llm_client.chat(
         [
             {"role": "system", "content": prompts.SYSTEM_PROMPT},
             {"role": "user", "content": prompts.CHUNK_PROMPT.format(title=title, diff_block=diff_block)},
-        ]
+        ],
+        model=model,
     )
 
 
-async def _single_pass(title: str, description: str, diff_block: str) -> str:
+async def _single_pass(title: str, description: str, diff_block: str, model: str) -> str:
     return await llm_client.chat(
         [
             {"role": "system", "content": prompts.SYSTEM_PROMPT},
@@ -94,11 +104,12 @@ async def _single_pass(title: str, description: str, diff_block: str) -> str:
                     title=title, description=description or "(none)", diff_block=diff_block
                 ),
             },
-        ]
+        ],
+        model=model,
     )
 
 
-async def _summarize(title: str, description: str, findings: list[str]) -> str:
+async def _summarize(title: str, description: str, findings: list[str], model: str) -> str:
     joined = "\n\n---\n\n".join(f"Chunk {i + 1}:\n{f}" for i, f in enumerate(findings))
     return await llm_client.chat(
         [
@@ -112,7 +123,8 @@ async def _summarize(title: str, description: str, findings: list[str]) -> str:
                     findings=joined,
                 ),
             },
-        ]
+        ],
+        model=model,
     )
 
 
@@ -153,27 +165,31 @@ async def run_review(project_id: int, mr_iid: int, project_name: str) -> None:
             log.info("  No diffs found, nothing to review. Done.")
             return
 
+        webhook_config = await db.get_webhook_config(project_id)
+        ignore_patterns = (webhook_config or {}).get("ignore_patterns", "")
+        diffs = filter_ignored_diffs(diffs, ignore_patterns)
         title = mr.get("title") or f"MR !{mr_iid}"
         description = mr.get("description") or ""
         web_url = mr.get("web_url") or ""
 
         # --- Chunk and review ---
-        chunks = split_diffs(diffs, config.MAX_CHUNK_CHARS)
-        log.info("[3/5] Reviewing with LLM (%s)...", config.OLLAMA_MODEL)
+        model = (webhook_config or {}).get("model") or settings.get("OLLAMA_MODEL")
+        chunks = split_diffs(diffs, settings.get("MAX_CHUNK_CHARS"))
+        log.info("[3/5] Reviewing with LLM (%s)...", model)
         log.info("  Split into %d chunk(s)", len(chunks))
 
         try:
             if len(chunks) == 1:
                 log.info("  Single-pass review (1 chunk)...")
                 t_llm = time.monotonic()
-                summary = await _single_pass(title, description, chunks[0])
+                summary = await _single_pass(title, description, chunks[0], model)
                 log.info("  LLM responded in %.1fs", time.monotonic() - t_llm)
             else:
                 findings: list[str] = []
                 for i, chunk in enumerate(chunks, start=1):
                     log.info("  Reviewing chunk %d/%d (%d chars)...", i, len(chunks), len(chunk))
                     t_llm = time.monotonic()
-                    content = await _review_chunk(title, chunk)
+                    content = await _review_chunk(title, chunk, model)
                     elapsed = time.monotonic() - t_llm
                     if content.strip().upper() != "NO_FINDINGS":
                         findings.append(content)
@@ -186,7 +202,7 @@ async def run_review(project_id: int, mr_iid: int, project_name: str) -> None:
                 else:
                     log.info("  Aggregating %d chunk findings into summary...", len(findings))
                     t_llm = time.monotonic()
-                    summary = await _summarize(title, description, findings)
+                    summary = await _summarize(title, description, findings, model)
                     log.info("  Summary generated in %.1fs", time.monotonic() - t_llm)
         except Exception:
             log.exception("[3/5] FAILED — LLM review error")
@@ -203,7 +219,7 @@ async def run_review(project_id: int, mr_iid: int, project_name: str) -> None:
                 mr_iid=mr_iid,
                 mr_title=title,
                 mr_url=web_url,
-                model=config.OLLAMA_MODEL,
+                model=model,
                 chunks_count=len(chunks),
                 review_text=summary,
             )
@@ -216,7 +232,7 @@ async def run_review(project_id: int, mr_iid: int, project_name: str) -> None:
             f"## Automated Code Review\n\n"
             f"{summary}\n\n"
             f"---\n"
-            f"_Reviewed by `{config.OLLAMA_MODEL}` across {len(chunks)} chunk(s)._"
+            f"_Reviewed by `{model}` across {len(chunks)} chunk(s)._"
         )
 
         log.info("[5/5] Posting results...")

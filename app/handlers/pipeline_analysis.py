@@ -1,7 +1,7 @@
 import logging
 import time
 
-from .. import config, llm_client, prompts
+from .. import llm_client, prompts
 from ..gitlab_client import GitLabClient
 from ._common import notify_and_save
 
@@ -29,6 +29,8 @@ async def handle_pipeline(payload: dict) -> None:
     if not project_id or not pipeline_id:
         log.info("Pipeline ignored: missing project_id or pipeline_id")
         return
+
+    model = await llm_client.model_for_project(project_id)
 
     log.info("========== PIPELINE ANALYSIS START ==========")
     log.info("Project: %s | Pipeline: #%s | Ref: %s | Status: %s", project_name, pipeline_id, ref, status)
@@ -81,7 +83,7 @@ async def handle_pipeline(payload: dict) -> None:
                     pipeline_id=pipeline_id,
                     jobs_block=jobs_block,
                 )},
-            ])
+            ], model=model)
         except Exception:
             log.exception("  LLM analysis failed")
             return
@@ -91,7 +93,7 @@ async def handle_pipeline(payload: dict) -> None:
             f"## Pipeline Failure Analysis — #{pipeline_id}\n\n"
             f"{analysis}\n\n"
             f"---\n"
-            f"_Analyzed by `{config.OLLAMA_MODEL}`._"
+            f"_Analyzed by `{model}`._"
         )
 
         if mr_info and mr_info.get("iid"):
@@ -113,7 +115,7 @@ async def handle_pipeline(payload: dict) -> None:
     await notify_and_save(
         event_type="pipeline_analysis", project_id=project_id, project_name=project_name,
         title=f"Pipeline #{pipeline_id} failed on {ref}",
-        url=pipeline_url, result_text=analysis, ref_id=str(pipeline_id),
+        url=pipeline_url, result_text=analysis, ref_id=str(pipeline_id), model=model,
     )
 
     log.info("========== PIPELINE ANALYSIS DONE in %.1fs ==========", time.monotonic() - t_start)

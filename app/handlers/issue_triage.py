@@ -2,7 +2,7 @@ import json
 import logging
 import time
 
-from .. import config, llm_client, prompts
+from .. import llm_client, prompts
 from ..gitlab_client import GitLabClient
 from ._common import notify_and_save
 
@@ -49,6 +49,8 @@ async def handle_issue_triage(payload: dict) -> None:
         log.info("Issue triage ignored: missing project_id or issue_iid")
         return
 
+    model = await llm_client.model_for_project(project_id)
+
     existing_labels = attrs.get("labels") or []
     if existing_labels:
         log.info("Issue #%s already has labels, skipping triage", issue_iid)
@@ -76,7 +78,7 @@ async def handle_issue_triage(payload: dict) -> None:
                     description=description or "(no description)",
                     available_labels=labels_str,
                 )},
-            ])
+            ], model=model)
         except Exception:
             log.exception("  LLM triage failed")
             return
@@ -87,7 +89,7 @@ async def handle_issue_triage(payload: dict) -> None:
             log.warning("  Could not parse triage response, posting raw response as comment")
             try:
                 await gl.post_issue_note(project_id, issue_iid,
-                                         f"## Auto-Triage\n\n{response}\n\n---\n_Triaged by `{config.OLLAMA_MODEL}`._")
+                                         f"## Auto-Triage\n\n{response}\n\n---\n_Triaged by `{model}`._")
             except Exception:
                 log.exception("  Failed to post issue comment")
             return
@@ -112,7 +114,7 @@ async def handle_issue_triage(payload: dict) -> None:
             f"**Severity:** {severity}\n"
             f"**Summary:** {summary}\n\n"
             f"---\n"
-            f"_Triaged by `{config.OLLAMA_MODEL}`._"
+            f"_Triaged by `{model}`._"
         )
 
         try:
@@ -125,7 +127,7 @@ async def handle_issue_triage(payload: dict) -> None:
     await notify_and_save(
         event_type="issue_triage", project_id=project_id, project_name=project_name,
         title=f"Issue #{issue_iid} — {title}",
-        url=issue_url, result_text=triage_comment, ref_id=str(issue_iid),
+        url=issue_url, result_text=triage_comment, ref_id=str(issue_iid), model=model,
     )
 
     log.info("========== ISSUE TRIAGE DONE in %.1fs ==========", time.monotonic() - t_start)
