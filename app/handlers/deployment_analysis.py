@@ -1,7 +1,7 @@
 import logging
 import time
 
-from .. import config, llm_client, prompts
+from .. import llm_client, prompts
 from ..gitlab_client import GitLabClient
 from ._common import notify_and_save
 
@@ -30,6 +30,8 @@ async def handle_deployment(payload: dict) -> None:
     if not project_id:
         log.info("Deployment ignored: missing project_id")
         return
+
+    model = await llm_client.model_for_project(project_id)
 
     log.info("========== DEPLOYMENT ANALYSIS START ==========")
     log.info("Project: %s | Env: %s | Status: %s | Ref: %s | Commit: %s",
@@ -66,7 +68,7 @@ async def handle_deployment(payload: dict) -> None:
                     job_log_section=job_log_section,
                     failure_instruction=failure_instruction,
                 )},
-            ])
+            ], model=model)
         except Exception:
             log.exception("  LLM analysis failed")
             return
@@ -76,7 +78,7 @@ async def handle_deployment(payload: dict) -> None:
             f"## Deployment Report — `{environment}`\n\n"
             f"{analysis}\n\n"
             f"---\n"
-            f"_Analyzed by `{config.OLLAMA_MODEL}`._"
+            f"_Analyzed by `{model}`._"
         )
 
         if short_sha:
@@ -92,7 +94,7 @@ async def handle_deployment(payload: dict) -> None:
         event_type="deployment_analysis", project_id=project_id, project_name=project_name,
         title=f"Deploy to {environment} — {status_label}",
         url=deployable_url, result_text=analysis,
-        ref_id=str(deployment_id or short_sha or "unknown"),
+        ref_id=str(deployment_id or short_sha or "unknown"), model=model,
     )
 
     log.info("========== DEPLOYMENT ANALYSIS DONE in %.1fs ==========", time.monotonic() - t_start)

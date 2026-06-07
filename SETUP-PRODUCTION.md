@@ -120,18 +120,7 @@ mkdir -p data
    - Expiration: set as needed
 3. Copy the token (starts with `glpat-`)
 
-### 2.2 Create an OAuth Application
-
-1. Go to GitLab → User Settings → Applications
-   (or Admin Area → Applications for instance-wide)
-2. Create:
-   - **Name:** Code Review Bot
-   - **Redirect URI:** `http://192.168.1.20:8888/code-review-bot/callback`
-   - **Confidential:** Yes
-   - **Scopes:** `read_user`
-3. Save. Copy the **Application ID** and **Secret**.
-
-### 2.3 Configure Webhook on project(s)
+### 2.2 Configure Webhook on project(s)
 
 For each GitLab project you want reviewed:
 
@@ -154,44 +143,32 @@ cd /opt/code-review-bot
 cp .env.prod.example .env
 ```
 
-### 3.2 Generate secrets
+### 3.2 Generate the session secret
 
 ```bash
-# Generate GITLAB_WEBHOOK_SECRET
-python3 -c "import secrets; print(secrets.token_hex(32))"
-
 # Generate SESSION_SECRET
 python3 -c "import secrets; print(secrets.token_hex(32))"
 ```
 
 ### 3.3 Fill in .env
 
-Edit `.env` and replace all placeholders:
+The `.env` only holds bootstrap settings. Everything else (GitLab, Ollama, chunking,
+webhook secret, re-trigger emoji) is configured in the admin UI after first launch.
 
 ```bash
 nano .env
 ```
 
-Example with real values:
 ```env
-GITLAB_URL=http://192.168.1.10:8088
-GITLAB_TOKEN=glpat-xxxxxxxxxxxxxxxxxxxx
-GITLAB_WEBHOOK_SECRET=<generated-secret>
-OLLAMA_URL=http://host.docker.internal:11434
-OLLAMA_MODEL=qwen2.5-coder:14b-instruct-q8_0
-OLLAMA_NUM_CTX=32768
-OLLAMA_TEMPERATURE=0.2
-OLLAMA_TIMEOUT_S=1800
-MAX_CHUNK_CHARS=80000
-DB_PATH=/data/reviews.db
-LOG_LEVEL=INFO
-GITLAB_OAUTH_APP_ID=<from-step-2.2>
-GITLAB_OAUTH_APP_SECRET=<from-step-2.2>
+ADMIN_PASSWORD=<choose-a-strong-password>
 SESSION_SECRET=<generated-secret>
-ADMIN_BASE_URL=http://192.168.1.20:8888
-GITLAB_OAUTH_BASE_URL=http://192.168.1.10:8088
-REVIEW_RETRIGGER_EMOJI=repeat
+LOG_LEVEL=INFO
+DB_PATH=/data/reviews.db
 ```
+
+> Optionally, you can pre-seed the operational settings on first boot by adding the
+> commented values from `.env.prod.example` (e.g. `GITLAB_URL`, `GITLAB_TOKEN`,
+> `OLLAMA_MODEL`). Otherwise just set them in the UI under **Settings**.
 
 ---
 
@@ -213,7 +190,7 @@ sudo ufw status
 ### PC 1 (GitLab Server)
 
 ```bash
-# GitLab must be reachable from PC 2 (API calls) and from browsers (OAuth)
+# GitLab must be reachable from PC 2 (API calls)
 sudo ufw allow 8088/tcp comment "GitLab"
 sudo ufw enable
 ```
@@ -263,8 +240,8 @@ curl http://localhost:8888/health/full | python3 -m json.tool
 2. Go to `http://192.168.1.20:8888/`
 3. Verify all status indicators are green
 4. Click "Open Admin Dashboard"
-5. You should be redirected to GitLab OAuth login
-6. After login, you see the dashboard
+5. Sign in with `ADMIN_PASSWORD`
+6. Open **Settings**, fill in GitLab/Ollama values, and use **Test connection** to verify
 7. **Create a test MR** on a GitLab project with a webhook configured
 8. Check bot logs: `docker compose logs -f`
 9. The bot should post review comments on the MR within minutes
@@ -287,10 +264,9 @@ docker exec review-bot curl http://host.docker.internal:11434/api/tags
 ```
 If fails: check Ollama is running with `OLLAMA_HOST=0.0.0.0`.
 
-### OAuth callback fails
-- Verify Redirect URI in GitLab OAuth app matches EXACTLY: `http://192.168.1.20:8888/code-review-bot/callback`
-- Verify `ADMIN_BASE_URL` in .env matches: `http://192.168.1.20:8888`
-- Verify `GITLAB_OAUTH_BASE_URL` is reachable from the browser
+### Can't sign in to the admin UI
+- Verify `ADMIN_PASSWORD` and `SESSION_SECRET` are both set in `.env`
+- After changing them, recreate the container: `docker compose up -d --force-recreate`
 
 ### Webhook not triggering
 ```bash

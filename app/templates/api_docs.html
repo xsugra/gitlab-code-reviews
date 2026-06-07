@@ -209,14 +209,9 @@
                 <td>Login page. Redirects to dashboard if already authenticated.</td>
             </tr>
             <tr>
-                <td><span class="badge badge-enabled">GET</span></td>
-                <td class="mono">/code-review-bot/start-oauth</td>
-                <td>Initiates the GitLab OAuth flow. Redirects the browser to GitLab for authorization.</td>
-            </tr>
-            <tr>
-                <td><span class="badge badge-enabled">GET</span></td>
-                <td class="mono">/code-review-bot/callback</td>
-                <td>OAuth callback — GitLab redirects here after authorization. Exchanges the code for a session cookie and redirects to the dashboard.</td>
+                <td><span class="badge badge-disabled">POST</span></td>
+                <td class="mono">/code-review-bot/login</td>
+                <td>Submits the admin password and, on success, sets a session cookie.</td>
             </tr>
             <tr>
                 <td><span class="badge badge-disabled">POST</span></td>

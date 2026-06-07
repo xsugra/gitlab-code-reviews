@@ -2,15 +2,16 @@ import logging
 
 import httpx
 
-from . import config
+from . import settings
 
 log = logging.getLogger(__name__)
 
 
 class GitLabClient:
-    def __init__(self, url: str = config.GITLAB_URL, token: str = config.GITLAB_TOKEN):
-        self.base = url.rstrip("/") + "/api/v4"
-        self.headers = {"PRIVATE-TOKEN": token}
+    def __init__(self, url: str | None = None, token: str | None = None):
+        self.url = url or settings.get("GITLAB_URL")
+        self.base = self.url.rstrip("/") + "/api/v4"
+        self.headers = {"PRIVATE-TOKEN": token or settings.get("GITLAB_TOKEN")}
         self._client = httpx.AsyncClient(headers=self.headers, timeout=60)
 
     async def close(self) -> None:
@@ -30,7 +31,7 @@ class GitLabClient:
             r.raise_for_status()
             return r
         except httpx.ConnectError:
-            log.error("Cannot connect to GitLab at %s — is it reachable?", config.GITLAB_URL)
+            log.error("Cannot connect to GitLab at %s — is it reachable?", self.url)
             raise
         except httpx.HTTPStatusError as e:
             log.error("GitLab HTTP %s on %s %s: %s",

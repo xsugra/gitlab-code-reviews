@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Settings • Code Review Bot{% endblock %}
+{% block content %}
+<h2>Settings</h2>
+<p>These values are stored in the database and apply immediately — no restart needed.</p>
+
+{% if error %}
+<div class="flash flash-error">{{ error }}</div>
+{% endif %}
+
+<form method="post" action="/code-review-bot/settings">
+    <input type="hidden" name="csrf_token" value="{{ session.csrf }}">
+
+    {% for group, fields in groups.items() %}
+    <article>
+        <h3 style="margin-top:0">{{ group }}</h3>
+        {% for f in fields %}
+        <label for="{{ f.key }}">
+            {{ f.label }}
+            {% if f.input == 'select' %}
+            <div class="combobox" data-combobox>
+                <div class="combobox-field">
+                    <input type="text" id="{{ f.key }}" name="{{ f.key }}" value="{{ f.value }}"
+                           class="combobox-input" data-combobox-input autocomplete="off" spellcheck="false"
+                           placeholder="Type or pick a model…" aria-describedby="help_{{ f.key }}"
+                           role="combobox" aria-expanded="false" aria-autocomplete="list">
+                    <button type="button" class="combobox-toggle" data-combobox-toggle
+                            aria-label="Show installed models" tabindex="-1">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                             stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                </div>
+                <div class="combobox-panel" data-combobox-panel hidden>
+                    <div class="combobox-panel-header">
+                        Installed models{% if installed_models %} · {{ installed_models|length }}{% endif %}
+                    </div>
+                    <ul class="combobox-list" data-combobox-list role="listbox">
+                        {% for m in installed_models %}
+                        <li class="combobox-option" role="option" data-value="{{ m }}" aria-selected="false">
+                            <svg class="combobox-option-icon" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                                <line x1="12" y1="22.08" x2="12" y2="12"/>
+                            </svg>
+                            <span class="combobox-option-name">{{ m.split(':')[0] }}</span>
+                            {% if ':' in m %}<span class="combobox-option-tag">{{ m.split(':', 1)[1] }}</span>{% endif %}
+                            <svg class="combobox-check" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                 stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    <div class="combobox-empty" data-combobox-empty {% if installed_models %}hidden{% endif %}>
+                        {% if installed_models %}No match — press Enter to use a custom name.{% else %}No models installed in Ollama. Type a name to use one you'll pull later.{% endif %}
+                    </div>
+                </div>
+                <span class="combobox-status" data-combobox-status></span>
+            </div>
+            {% elif f.input == 'number' %}
+            <input type="number" step="any" id="{{ f.key }}" name="{{ f.key }}"
+                   value="{{ f.value }}" aria-describedby="help_{{ f.key }}">
+            {% elif f.input == 'password' %}
+            <input type="password" id="{{ f.key }}" name="{{ f.key }}"
+                   value="{{ f.value }}" autocomplete="off" aria-describedby="help_{{ f.key }}">
+            {% else %}
+            <input type="text" id="{{ f.key }}" name="{{ f.key }}"
+                   value="{{ f.value }}" aria-describedby="help_{{ f.key }}">
+            {% endif %}
+            <small id="help_{{ f.key }}">{{ f.help }}</small>
+        </label>
+        {% endfor %}
+    </article>
+    {% endfor %}
+
+    <button type="submit">Save settings</button>
+</form>
+
+<article>
+    <h3 style="margin-top:0">Connection tests</h3>
+    <p>Test the currently saved settings against GitLab and Ollama.</p>
+    <div style="display:flex;gap:0.5rem">
+        <form action="/code-review-bot/settings/test/gitlab" method="post" style="margin:0">
+            <input type="hidden" name="csrf_token" value="{{ session.csrf }}">
+            <button type="submit" class="outline secondary">Test GitLab</button>
+        </form>
+        <form action="/code-review-bot/settings/test/ollama" method="post" style="margin:0">
+            <input type="hidden" name="csrf_token" value="{{ session.csrf }}">
+            <button type="submit" class="outline secondary">Test Ollama</button>
+        </form>
+    </div>
+</article>
+{% endblock %}

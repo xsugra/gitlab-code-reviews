@@ -100,7 +100,7 @@ Teraz prepojte Google Chat webhook s vaším GitLab projektom v admin paneli bot
 
 1. Otvorte admin rozhranie bota: `http://<BOT_IP>:port/code-review-bot/`
 ![Screenshot 2026-05-27 at 16.47.48.png](images/Screenshot%202026-05-27%20at%2016.47.48.png)
-2. Prihláste sa vaším GitLab účtom (OAuth).
+2. Prihláste sa administrátorským heslom (`ADMIN_PASSWORD`).
 3. Choďte na **Webhooks** v navigácii.
 4. Kliknite na **Add New Webhook**.
 ![Screenshot 2026-05-27 at 16.48.01.png](images/Screenshot%202026-05-27%20at%2016.48.01.png)
