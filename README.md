@@ -29,7 +29,7 @@
 │  (events)    │                   │   (FastAPI)      │ ◂──────────────── │  (local AI) │
 └──────────────┘                   │                  │                   └─────────────┘
                                    │  ┌────────────┐  │
-┌──────────────┐   OAuth + UI      │  │  SQLite DB │  │     notification
+┌──────────────┐   password + UI   │  │  SQLite DB │  │     notification
 │   Browser    │ ────────────────▸ │  │  reviews   │  │ ────────────────▸  Google Chat
 │  (admin UI)  │ ◂──────────────── │  │  events    │  │                    (per-project)
 └──────────────┘                   │  └────────────┘  │
@@ -61,7 +61,7 @@ The bot hooks into your GitLab instance and processes multiple event types:
 | :speech_balloon:       | **GitLab Integration**         | Posts findings as MR comments, commit comments, and issue notes                        |
 | :bell:                 | **Google Chat Notifications**  | Rich Card notifications per-project for all event types                                |
 | :globe_with_meridians: | **Admin Dashboard**            | Web UI for managing webhooks, browsing reviews, and monitoring health                  |
-| :lock:                 | **GitLab OAuth**               | Authenticate via your existing GitLab accounts                                         |
+| :lock:                 | **Password login**             | Single shared password gates the admin UI (for trusted networks)                       |
 | :whale:                | **Docker Deployment**          | Single `docker compose up` — no complex setup                                          |
 | :floppy_disk:          | **Event History**              | All reviews and events stored in SQLite with search and filtering                      |
 
@@ -126,78 +126,69 @@ That's it — open a merge request and the bot will review it automatically.
 
 ## Admin UI Setup
 
-The admin panel lets any GitLab user configure per-project Google Chat notifications.
-
-### Register an OAuth app on GitLab
-
-1. Go to **User Settings → Applications** (or **Admin → Applications**).
-2. Create an application:
-
-| Field        | Value                                              |
-|--------------|----------------------------------------------------|
-| Name         | `Code Review Bot`                                  |
-| Redirect URI | `http://<your-host>:8888/code-review-bot/callback` |
-| Confidential | Yes                                                |
-| Scopes       | `read_user`                                        |
-
-3. Copy the **Application ID** and **Secret**.
+The admin panel is gated by a single shared password (intended for a trusted,
+non-public network). From it you configure all operational settings and
+per-project Google Chat notifications.
 
 ### Add to `.env`
 
 ```bash
-GITLAB_OAUTH_APP_ID=<Application ID>
-GITLAB_OAUTH_APP_SECRET=<Secret>
+ADMIN_PASSWORD=<your password>
 SESSION_SECRET=$(python -c "import secrets; print(secrets.token_hex(32))")
-ADMIN_BASE_URL=http://<your-host>:8888
 ```
 
-> If `GITLAB_URL` uses a Docker-internal address (e.g. `host.docker.internal`), also set `GITLAB_OAUTH_BASE_URL` to the
-> browser-accessible GitLab URL.
+Rebuild and open `http://<your-host>:8888/code-review-bot/`, then sign in with the password.
 
-Rebuild and open `http://<your-host>:8888/code-review-bot/`.
+### Configure operational settings
+
+Go to **Settings**. Everything that used to live in `.env` — GitLab URL & token,
+Ollama URL/model/tuning, chunk size, webhook secret, re-trigger emoji — is edited
+here and stored in the database. Each field has inline guidance on where to find
+its value, and **Test connection** buttons verify GitLab and Ollama. Changes apply
+immediately, no restart needed.
+
+> On first boot, settings are seeded from any matching env vars you set, then the
+> database becomes the source of truth.
 
 ### Configure a project webhook
 
-1. Sign in with your GitLab account.
-2. Go to **Webhooks → Add New Webhook**.
-3. Enter the **Project ID** (GitLab → project Settings → General).
-4. Paste the **Google Chat Webhook URL** (Space settings → Manage webhooks).
+1. Go to **Webhooks → Add New Webhook**.
+2. Enter the **Project ID** (GitLab → project Settings → General).
+3. Paste the **Google Chat Webhook URL** (Space settings → Manage webhooks).
+4. *(Optional)* Set a **Model override** — pick an installed model or type a custom name. Leave empty to use the global default. Applies to all LLM events for that project.
 5. Click **Create**, then **Test** to verify.
 
-Projects without a webhook still get reviews on GitLab — they just don't get a chat notification.
+Projects without a webhook still get reviews on GitLab — they just don't get a chat notification (and use the global default model).
 
 ---
 
 ## Configuration Reference
 
-### Core
+### Bootstrap (`.env`)
 
-| Variable                | Required | Default               | Purpose                           |
-|-------------------------|:--------:|-----------------------|-----------------------------------|
-| `GITLAB_URL`            |   Yes    | —                     | GitLab instance base URL          |
-| `GITLAB_TOKEN`          |   Yes    | —                     | GitLab token with `api` scope     |
-| `GITLAB_WEBHOOK_SECRET` |    —     | empty                 | Validates `X-Gitlab-Token` header |
-| `OLLAMA_URL`            |    —     | `http://ollama:11434` | Ollama API endpoint               |
-| `OLLAMA_MODEL`          |    —     | `qwen2.5-coder:14b`   | LLM model name                    |
-| `OLLAMA_NUM_CTX`        |    —     | `32768`               | Context window (tokens)           |
-| `OLLAMA_TEMPERATURE`    |    —     | `0.2`                 | Generation temperature            |
-| `OLLAMA_TIMEOUT_S`      |    —     | `1800`                | LLM request timeout (seconds)     |
-| `MAX_CHUNK_CHARS`       |    —     | `80000`               | Diff chunk size limit             |
-| `DB_PATH`               |    —     | `/data/reviews.db`    | SQLite database path              |
-| `LOG_LEVEL`             |    —     | `INFO`                | Logging level                     |
-| `REVIEW_RETRIGGER_EMOJI`|    —     | `repeat`              | Emoji name that re-triggers review|
+| Variable         | Required | Default            | Purpose                          |
+|------------------|:--------:|--------------------|----------------------------------|
+| `ADMIN_PASSWORD` |   Yes    | —                  | Password to sign in to admin UI  |
+| `SESSION_SECRET` |   Yes    | —                  | Cookie signing key               |
+| `LOG_LEVEL`      |    —     | `INFO`             | Logging level (applied at start) |
+| `DB_PATH`        |    —     | `/data/reviews.db` | SQLite database path             |
 
-### Admin UI (GitLab OAuth)
+> The admin UI is enabled when both `ADMIN_PASSWORD` and `SESSION_SECRET` are set.
 
-| Variable                  | Required | Default        | Purpose                       |
-|---------------------------|:--------:|----------------|-------------------------------|
-| `GITLAB_OAUTH_APP_ID`     |    —     | empty          | OAuth Application ID          |
-| `GITLAB_OAUTH_APP_SECRET` |    —     | empty          | OAuth Application Secret      |
-| `SESSION_SECRET`          |    —     | empty          | Cookie signing key            |
-| `ADMIN_BASE_URL`          |    —     | empty          | This service's base URL       |
-| `GITLAB_OAUTH_BASE_URL`   |    —     | = `GITLAB_URL` | Browser-accessible GitLab URL |
+### Runtime settings (admin UI → Settings, stored in DB)
 
-> Leave OAuth variables empty to disable the admin UI. The bot still processes webhooks normally.
+| Setting                  | Default                  | Purpose                            |
+|--------------------------|--------------------------|------------------------------------|
+| `GITLAB_URL`             | —                        | GitLab instance base URL           |
+| `GITLAB_TOKEN`           | —                        | GitLab token with `api` scope      |
+| `GITLAB_WEBHOOK_SECRET`  | empty                    | Validates `X-Gitlab-Token` header  |
+| `OLLAMA_URL`             | `http://host.docker.internal:11434` | Ollama API endpoint     |
+| `OLLAMA_MODEL`           | `qwen2.5-coder:14b-instruct-q8_0`   | LLM model name          |
+| `OLLAMA_NUM_CTX`         | `32768`                  | Context window (tokens)            |
+| `OLLAMA_TEMPERATURE`     | `0.2`                    | Generation temperature             |
+| `OLLAMA_TIMEOUT_S`       | `1800`                   | LLM request timeout (seconds)      |
+| `MAX_CHUNK_CHARS`        | `80000`                  | Diff chunk size limit              |
+| `REVIEW_RETRIGGER_EMOJI` | `repeat`                 | Emoji name that re-triggers review |
 
 ---
 
@@ -215,11 +206,12 @@ Projects without a webhook still get reviews on GitLab — they just don't get a
 | `GET`  | `/reviews`     | Review history (query: `project_id`, `mr_iid`, `limit`)  |
 | `GET`  | `/events`      | Event history (query: `event_type`, `project_id`, `limit`) |
 
-### Admin UI (GitLab OAuth required)
+### Admin UI (password required)
 
 | Method | Endpoint                    | Description                 |
 |:------:|-----------------------------|-----------------------------|
 | `GET`  | `/code-review-bot/`         | Dashboard                   |
+| `GET`  | `/code-review-bot/settings` | Operational settings        |
 | `GET`  | `/code-review-bot/webhooks` | Webhook management          |
 | `GET`  | `/code-review-bot/reviews`  | Review browser with filters |
 | `GET`  | `/code-review-bot/health`   | System health dashboard     |
@@ -256,7 +248,7 @@ Webhook ─▸ Parse event ─▸ Fetch context ─▸ LLM analysis ─▸ Save 
 
 | Measure              | Implementation                                                |
 |----------------------|---------------------------------------------------------------|
-| **Authentication**   | GitLab OAuth2 with `read_user` scope                          |
+| **Authentication**   | Single shared password (`ADMIN_PASSWORD`), constant-time compare |
 | **Sessions**         | HMAC-SHA256 signed cookies, HttpOnly, SameSite=Lax, 8h expiry |
 | **CSRF**             | Per-session token validated on every POST                     |
 | **XSS**              | Jinja2 autoescaping on all templates                          |
@@ -264,20 +256,22 @@ Webhook ─▸ Parse event ─▸ Fetch context ─▸ LLM analysis ─▸ Save 
 | **Input validation** | Project ID > 0, webhook URLs must be HTTPS                    |
 | **Logging**          | Webhook URLs and secrets are never logged                     |
 
-> **HTTP note**: Without a TLS reverse proxy, OAuth tokens and cookies transit unencrypted. Acceptable on a trusted
-> internal network; add HTTPS for internet-facing deployments.
+> **HTTP note**: Without a TLS reverse proxy, the password and cookies transit unencrypted. Acceptable on a trusted
+> internal network; add HTTPS for internet-facing deployments. Because GitLab tokens are stored in the database,
+> keep the host on a trusted network.
 
 ---
 
 ## Database
 
-SQLite with WAL journal mode. Three tables, managed via `CREATE TABLE IF NOT EXISTS` on every startup:
+SQLite with WAL journal mode. Tables managed via `CREATE TABLE IF NOT EXISTS` on every startup:
 
 | Table             | Purpose                                                                 |
 |-------------------|-------------------------------------------------------------------------|
 | `reviews`         | MR review history (project, MR, model, chunks, review text, timestamp)  |
 | `events`          | All other event results (type, project, ref, model, result, timestamp)  |
 | `webhook_configs` | Per-project Google Chat webhooks (project ID, URL, enabled, timestamps) |
+| `app_settings`    | Operational configuration edited from the admin UI (key/value)          |
 
 ---
 
@@ -286,14 +280,15 @@ SQLite with WAL journal mode. Three tables, managed via `CREATE TABLE IF NOT EXI
 ```text
 app/
 ├── main.py              FastAPI app, webhook router, health endpoints
-├── admin.py             Admin UI: OAuth, sessions, CSRF, webhook CRUD
+├── admin.py             Admin UI: password login, sessions, CSRF, settings + webhook CRUD
 ├── reviewer.py          MR code review pipeline (chunked)
 ├── gitlab_client.py     GitLab API client (shared httpx session)
 ├── llm_client.py        Ollama chat client
 ├── google_chat.py       Google Chat Cards v2 formatting
 ├── prompts.py           LLM prompt templates (all event types)
 ├── db.py                SQLite schema and queries
-├── config.py            Environment variable parsing
+├── config.py            Bootstrap env vars (auth, logging)
+├── settings.py          DB-backed runtime settings (GitLab, Ollama, review)
 ├── handlers/
 │   ├── __init__.py
 │   ├── _common.py       Shared notify + save boilerplate
@@ -309,7 +304,8 @@ app/
 │   ├── base.html        Layout with nav and Pico CSS
 │   ├── home.html        Public homepage
 │   ├── api_docs.html    API documentation page
-│   ├── login.html       GitLab OAuth login
+│   ├── login.html       Password login
+│   ├── settings.html    Operational settings form
 │   ├── dashboard.html   Overview dashboard
 │   ├── reviews.html     Review history browser
 │   ├── health.html      System health

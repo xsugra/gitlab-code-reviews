@@ -1,6 +1,6 @@
 import logging
 
-from .. import config, db, google_chat
+from .. import db, google_chat, settings
 
 log = logging.getLogger(__name__)
 
@@ -14,6 +14,7 @@ async def notify_and_save(
         url: str,
         result_text: str,
         ref_id: str,
+        model: str | None = None,
 ) -> None:
     try:
         webhook_config = await db.get_webhook_config(project_id)
@@ -34,7 +35,7 @@ async def notify_and_save(
             project_name=project_name,
             ref_id=ref_id,
             ref_url=url,
-            model=config.OLLAMA_MODEL,
+            model=model or settings.get("OLLAMA_MODEL"),
             result_text=result_text,
         )
     except Exception:

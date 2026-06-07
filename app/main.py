@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import config, db
+from . import config, db, settings
 from .admin import router as admin_router
 from .reviewer import run_review
 from .admin import _get_session
@@ -30,14 +30,16 @@ log = logging.getLogger("review-bot")
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     log.info("=== Review Bot starting ===")
-    log.info("GITLAB_URL = %s", config.GITLAB_URL)
-    log.info("OLLAMA_URL = %s", config.OLLAMA_URL)
-    log.info("OLLAMA_MODEL = %s", config.OLLAMA_MODEL)
-    log.info("WEBHOOK_SECRET = %s", "set" if config.GITLAB_WEBHOOK_SECRET else "NOT set (accepting all)")
-    log.info("MAX_CHUNK_CHARS = %s", config.MAX_CHUNK_CHARS)
-    log.info("ADMIN_UI = %s",
-             "enabled" if config.GITLAB_OAUTH_APP_ID else "disabled (set GITLAB_OAUTH_APP_ID to enable)")
     await db.init()
+    await settings.seed_from_env_if_empty()
+    await settings.load()
+    log.info("GITLAB_URL = %s", settings.get("GITLAB_URL"))
+    log.info("OLLAMA_URL = %s", settings.get("OLLAMA_URL"))
+    log.info("OLLAMA_MODEL = %s", settings.get("OLLAMA_MODEL"))
+    log.info("WEBHOOK_SECRET = %s", "set" if settings.get("GITLAB_WEBHOOK_SECRET") else "NOT set (accepting all)")
+    log.info("MAX_CHUNK_CHARS = %s", settings.get("MAX_CHUNK_CHARS"))
+    log.info("ADMIN_UI = %s",
+             "enabled" if config.ADMIN_PASSWORD else "disabled (set ADMIN_PASSWORD to enable)")
     log.info("=== Review Bot ready ===")
     yield
     log.info("=== Review Bot shutting down ===")
@@ -66,14 +68,17 @@ async def api_docs(request: Request):
 @app.get("/health")
 async def health() -> dict:
     """Basic liveness check."""
-    return {"ok": True, "model": config.OLLAMA_MODEL}
+    return {"ok": True, "model": settings.get("OLLAMA_MODEL")}
 
 
 @app.get("/health/full")
 async def health_full() -> dict:
     """Deep health check: verify Ollama, GitLab, and DB connectivity."""
+    model = settings.get("OLLAMA_MODEL")
+    ollama_url = settings.get("OLLAMA_URL")
+    gitlab_url = settings.get("GITLAB_URL")
     results: dict = {
-        "model": config.OLLAMA_MODEL,
+        "model": model,
         "ollama": {"status": "unknown"},
         "gitlab": {"status": "unknown"},
         "db": {"status": "unknown"},
@@ -83,36 +88,36 @@ async def health_full() -> dict:
     # Check Ollama
     try:
         async with httpx.AsyncClient(timeout=10) as c:
-            r = await c.get(f"{config.OLLAMA_URL}/api/tags")
+            r = await c.get(f"{ollama_url}/api/tags")
             r.raise_for_status()
             models = [m["name"] for m in r.json().get("models", [])]
-            model_found = any(config.OLLAMA_MODEL in m for m in models)
+            model_found = any(model in m for m in models)
             results["ollama"] = {
                 "status": "ok" if model_found else "warning",
-                "url": config.OLLAMA_URL,
+                "url": ollama_url,
                 "models_available": models,
                 "target_model_loaded": model_found,
             }
             if not model_found:
                 results["ollama"][
-                    "warning"] = f"Model '{config.OLLAMA_MODEL}' not found. Run: ollama pull {config.OLLAMA_MODEL}"
+                    "warning"] = f"Model '{model}' not found. Run: ollama pull {model}"
     except Exception as e:
-        results["ollama"] = {"status": "error", "url": config.OLLAMA_URL, "error": str(e)}
+        results["ollama"] = {"status": "error", "url": ollama_url, "error": str(e)}
 
     # Check GitLab
     try:
         async with httpx.AsyncClient(timeout=10) as c:
             r = await c.get(
-                f"{config.GITLAB_URL.rstrip('/')}/api/v4/version",
-                headers={"PRIVATE-TOKEN": config.GITLAB_TOKEN},
+                f"{gitlab_url.rstrip('/')}/api/v4/version",
+                headers={"PRIVATE-TOKEN": settings.get("GITLAB_TOKEN")},
             )
             r.raise_for_status()
-            results["gitlab"] = {"status": "ok", "url": config.GITLAB_URL, "version": r.json()}
+            results["gitlab"] = {"status": "ok", "url": gitlab_url, "version": r.json()}
     except httpx.HTTPStatusError as e:
-        results["gitlab"] = {"status": "error", "url": config.GITLAB_URL, "http_code": e.response.status_code,
-                             "error": "Authentication failed — check GITLAB_TOKEN"}
+        results["gitlab"] = {"status": "error", "url": gitlab_url, "http_code": e.response.status_code,
+                             "error": "Authentication failed — check GitLab token in Settings"}
     except Exception as e:
-        results["gitlab"] = {"status": "error", "url": config.GITLAB_URL, "error": str(e)}
+        results["gitlab"] = {"status": "error", "url": gitlab_url, "error": str(e)}
 
     # Check DB
     try:
@@ -169,8 +174,9 @@ async def webhook(
 ) -> dict:
     log.info("Webhook received: event=%s", x_gitlab_event)
 
-    if config.GITLAB_WEBHOOK_SECRET:
-        if x_gitlab_token != config.GITLAB_WEBHOOK_SECRET:
+    webhook_secret = settings.get("GITLAB_WEBHOOK_SECRET")
+    if webhook_secret:
+        if x_gitlab_token != webhook_secret:
             log.warning("Webhook rejected: invalid secret token")
             raise HTTPException(status_code=401, detail="invalid webhook token")
 
@@ -348,8 +354,9 @@ def _handle_emoji_webhook(payload: dict, background: BackgroundTasks) -> dict:
         log.info("Emoji ignored: action=%s (emoji=:%s: by %s)", attrs.get("action"), emoji_name, user)
         return {"ignored": "emoji not awarded"}
 
-    if emoji_name != config.REVIEW_RETRIGGER_EMOJI:
-        log.debug("Emoji ignored: :%s: by %s (trigger emoji is :%s:)", emoji_name, user, config.REVIEW_RETRIGGER_EMOJI)
+    retrigger_emoji = settings.get("REVIEW_RETRIGGER_EMOJI")
+    if emoji_name != retrigger_emoji:
+        log.debug("Emoji ignored: :%s: by %s (trigger emoji is :%s:)", emoji_name, user, retrigger_emoji)
         return {"ignored": f"emoji={emoji_name}"}
 
     if attrs.get("awardable_type") != "MergeRequest":

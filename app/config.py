@@ -8,24 +8,13 @@ def _env(name: str, default: str | None = None, required: bool = False) -> str:
     return val or ""
 
 
-GITLAB_URL = _env("GITLAB_URL", required=True)
-GITLAB_TOKEN = _env("GITLAB_TOKEN", required=True)
-GITLAB_WEBHOOK_SECRET = _env("GITLAB_WEBHOOK_SECRET")
-
-OLLAMA_URL = _env("OLLAMA_URL", "http://ollama:11434")
-OLLAMA_MODEL = _env("OLLAMA_MODEL", "qwen2.5-coder:14b")
-OLLAMA_NUM_CTX = int(_env("OLLAMA_NUM_CTX", "32768"))
-OLLAMA_TEMPERATURE = float(_env("OLLAMA_TEMPERATURE", "0.2"))
-OLLAMA_TIMEOUT_S = int(_env("OLLAMA_TIMEOUT_S", "1800"))
-
-MAX_CHUNK_CHARS = int(_env("MAX_CHUNK_CHARS", "80000"))
+# Bootstrap-only config: values needed before the DB/admin UI exist.
+# Everything else (GitLab, Ollama, review behaviour) lives in the DB and is
+# editable from the admin UI — see app/settings.py.
 
 LOG_LEVEL = _env("LOG_LEVEL", "INFO")
 
-GITLAB_OAUTH_APP_ID = _env("GITLAB_OAUTH_APP_ID")
-GITLAB_OAUTH_APP_SECRET = _env("GITLAB_OAUTH_APP_SECRET")
+# Admin UI auth: a single shared password gates the dashboard; the session
+# secret signs the login cookie. Both must be set for the UI to be enabled.
 SESSION_SECRET = _env("SESSION_SECRET")
-ADMIN_BASE_URL = _env("ADMIN_BASE_URL")
-GITLAB_OAUTH_BASE_URL = _env("GITLAB_OAUTH_BASE_URL") or GITLAB_URL
-
-REVIEW_RETRIGGER_EMOJI = _env("REVIEW_RETRIGGER_EMOJI", "repeat")
+ADMIN_PASSWORD = _env("ADMIN_PASSWORD")
