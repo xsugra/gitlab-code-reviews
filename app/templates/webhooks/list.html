@@ -14,6 +14,7 @@
             <th>Project ID</th>
             <th>Project Name</th>
             <th>Webhook URL</th>
+            <th>Model</th>
             <th>Status</th>
             <th>Created by</th>
             <th>Last edit by</th>
@@ -27,6 +28,13 @@
             <td class="mono">{{ cfg.project_id }}</td>
             <td>{{ cfg.project_name or '—' }}</td>
             <td class="mono" title="URL is masked for security">{{ mask_url(cfg.webhook_url) }}</td>
+            <td>
+                {% if cfg.model %}
+                <span class="mono">{{ cfg.model }}</span>
+                {% else %}
+                <span style="color:var(--pico-muted-color)">default</span>
+                {% endif %}
+            </td>
             <td>
                 {% if cfg.enabled %}
                 <span class="badge badge-enabled">Enabled</span>
