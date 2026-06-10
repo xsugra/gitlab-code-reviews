@@ -32,6 +32,7 @@ Prístup z browsera:
 
 - PC 1: GitLab already running and accessible
 - PC 2: Ubuntu with min. 16GB RAM (for 14B model), ideally GPU
+- PC 2 host tools: `git`, `make`, and `sqlite3` installed on the host (used by `make upgrade` / `backup.sh`, which run outside Docker)
 - Both PCs on the same network
 - Ports open between them (see firewall section)
 
@@ -58,6 +59,9 @@ sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin d
 
 # Add your user to docker group (logout/login required after)
 sudo usermod -aG docker $USER
+
+# Host CLI tools used by the Makefile (git/make/sqlite3 run on the host, not in Docker)
+sudo apt install -y git make sqlite3
 ```
 
 ### 1.2 Install Ollama
