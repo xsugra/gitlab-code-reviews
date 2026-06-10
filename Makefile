@@ -15,7 +15,7 @@ restart: stop start
 # ─── Upgrade ──────────────────────────────────────────────────────────
 
 upgrade: backup
-	git pull nsoric main
+	git pull --ff-only nsoric main
 	docker compose down
 	docker compose up -d --build
 
