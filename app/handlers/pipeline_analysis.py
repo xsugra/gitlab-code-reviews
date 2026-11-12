@@ -1,7 +1,7 @@
 import logging
 import time
 
-from .. import llm_client, prompts
+from .. import llm_client, prompts, settings
 from ..gitlab_client import GitLabClient
 from ._common import notify_and_save
 
@@ -96,7 +96,9 @@ async def handle_pipeline(payload: dict) -> None:
             f"_Analyzed by `{model}`._"
         )
 
-        if mr_info and mr_info.get("iid"):
+        if not settings.gitlab_comments("other"):
+            log.info("  GitLab comment skipped (GITLAB_COMMENTS=%s), result goes to Google Chat only", settings.get("GITLAB_COMMENTS"))
+        elif mr_info and mr_info.get("iid"):
             try:
                 await gl.post_note(project_id, mr_info["iid"], comment)
                 log.info("  Posted analysis to MR !%s", mr_info["iid"])

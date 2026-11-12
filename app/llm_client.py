@@ -13,7 +13,8 @@ async def model_for_project(project_id: int) -> str:
     return (cfg or {}).get("model") or settings.get("OLLAMA_MODEL")
 
 
-async def chat(messages: list[dict], num_ctx: int | None = None, model: str | None = None) -> str:
+async def chat(messages: list[dict], num_ctx: int | None = None, model: str | None = None,
+               json_mode: bool = False) -> str:
     model = model or settings.get("OLLAMA_MODEL")
     ollama_url = settings.get("OLLAMA_URL")
     timeout_s = settings.get("OLLAMA_TIMEOUT_S")
@@ -26,6 +27,9 @@ async def chat(messages: list[dict], num_ctx: int | None = None, model: str | No
             "num_ctx": num_ctx or settings.get("OLLAMA_NUM_CTX"),
         },
     }
+    if json_mode:
+        # Ollama constrains the output to valid JSON.
+        payload["format"] = "json"
     log.debug("LLM request: model=%s, messages=%d, num_ctx=%s", model, len(messages),
               num_ctx or settings.get("OLLAMA_NUM_CTX"))
     try:

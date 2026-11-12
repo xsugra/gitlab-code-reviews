@@ -494,6 +494,14 @@ async def update_settings(request: Request):
         if key not in form:
             continue
         raw = (form.get(key) or "").strip()
+        if field.get("options") and raw not in {value for value, _ in field["options"]}:
+            return templates.TemplateResponse("settings.html", {
+                "request": request,
+                "session": session,
+                "groups": _grouped_fields(),
+                "installed_models": await _installed_ollama_models(),
+                "error": f"'{field['label']}' has an invalid value.",
+            }, status_code=400)
         if raw and field["type"] in ("int", "float"):
             try:
                 number = int(raw) if field["type"] == "int" else float(raw)

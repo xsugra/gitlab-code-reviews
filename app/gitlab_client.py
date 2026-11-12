@@ -70,6 +70,39 @@ class GitLabClient:
         )
         return r.json()
 
+    async def update_note(self, project_id: int, mr_iid: int, note_id: int, body: str) -> dict:
+        # Editing a note does not send notification emails (posting a new one does).
+        r = await self._request(
+            "PUT", f"/projects/{project_id}/merge_requests/{mr_iid}/notes/{note_id}",
+            json={"body": body},
+        )
+        return r.json()
+
+    async def list_mr_notes(self, project_id: int, mr_iid: int, max_pages: int = 5) -> list[dict]:
+        notes: list[dict] = []
+        for page in range(1, max_pages + 1):
+            r = await self._request(
+                "GET", f"/projects/{project_id}/merge_requests/{mr_iid}/notes",
+                params={"page": page, "per_page": 100, "sort": "desc", "order_by": "created_at"},
+            )
+            batch = r.json()
+            notes.extend(batch)
+            if len(batch) < 100:
+                break
+        return notes
+
+    async def get_current_user(self) -> dict:
+        r = await self._request("GET", "/user")
+        return r.json()
+
+    async def find_open_mr_for_branch(self, project_id: int, branch: str) -> dict | None:
+        r = await self._request(
+            "GET", f"/projects/{project_id}/merge_requests",
+            params={"state": "opened", "source_branch": branch, "per_page": 1},
+        )
+        items = r.json()
+        return items[0] if items else None
+
     async def update_mr(self, project_id: int, mr_iid: int, **fields) -> dict:
         r = await self._request("PUT", f"/projects/{project_id}/merge_requests/{mr_iid}", json=fields)
         return r.json()

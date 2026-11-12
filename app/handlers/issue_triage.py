@@ -2,7 +2,7 @@ import json
 import logging
 import time
 
-from .. import llm_client, prompts
+from .. import llm_client, prompts, settings
 from ..gitlab_client import GitLabClient
 from ._common import notify_and_save
 
@@ -86,16 +86,18 @@ async def handle_issue_triage(payload: dict) -> None:
 
         triage = _parse_triage_response(response)
         if not triage:
-            log.warning("  Could not parse triage response, posting raw response as comment")
-            try:
-                await gl.post_issue_note(project_id, issue_iid,
-                                         f"## Auto-Triage\n\n{response}\n\n---\n_Triaged by `{model}`._")
-            except Exception:
-                log.exception("  Failed to post issue comment")
+            log.warning("  Could not parse triage response")
+            if settings.gitlab_comments("other"):
+                try:
+                    await gl.post_issue_note(project_id, issue_iid,
+                                             f"## Auto-Triage\n\n{response}\n\n---\n_Triaged by `{model}`._")
+                except Exception:
+                    log.exception("  Failed to post issue comment")
             return
 
         labels_to_add = triage.get("labels", [])
-        if isinstance(labels_to_add, list) and labels_to_add:
+        # Labels don't email anyone (only label subscribers), so they stay on unless comments are fully off.
+        if settings.get("GITLAB_COMMENTS") != "none" and isinstance(labels_to_add, list) and labels_to_add:
             valid_labels = [l for l in labels_to_add if l in available_labels]
             if valid_labels:
                 try:
@@ -117,11 +119,14 @@ async def handle_issue_triage(payload: dict) -> None:
             f"_Triaged by `{model}`._"
         )
 
-        try:
-            await gl.post_issue_note(project_id, issue_iid, triage_comment)
-            log.info("  Posted triage comment on issue #%s", issue_iid)
-        except Exception:
-            log.exception("  Failed to post triage comment")
+        if settings.gitlab_comments("other"):
+            try:
+                await gl.post_issue_note(project_id, issue_iid, triage_comment)
+                log.info("  Posted triage comment on issue #%s", issue_iid)
+            except Exception:
+                log.exception("  Failed to post triage comment")
+        else:
+            log.info("  GitLab comment skipped (GITLAB_COMMENTS=%s), result goes to Google Chat only", settings.get("GITLAB_COMMENTS"))
 
     issue_url = attrs.get("url") or ""
     await notify_and_save(

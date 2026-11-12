@@ -72,6 +72,38 @@ SETTINGS_SCHEMA: list[dict] = [
         "help": "GitLab emoji name (no colons) that re-triggers a review when added to an MR. "
                 "e.g. `repeat` = 🔄. Requires \"Emoji events\" enabled on the webhook.",
     },
+    {
+        "key": "REVIEW_MIN_CONFIDENCE", "label": "Minimum finding confidence", "group": "Review",
+        "type": "str", "default": "medium", "input": "choice",
+        "options": [("high", "High: fewest false alarms, may miss some real issues"),
+                    ("medium", "Medium (recommended)"),
+                    ("low", "Low: report everything the model finds")],
+        "help": "Findings the model rates below this confidence are dropped. Raise it to High if the bot "
+                "still raises too many false alarms.",
+    },
+    {
+        "key": "REVIEW_VERIFY", "label": "Double-check findings", "group": "Review",
+        "type": "str", "default": "on", "input": "choice",
+        "options": [("on", "On (recommended)"), ("off", "Off: faster, more false alarms")],
+        "help": "Asks the model a second time, skeptically, whether each finding is real, and drops the "
+                "ones it rejects. Costs one short extra LLM call per finding.",
+    },
+    {
+        "key": "REVIEW_MAX_FINDINGS", "label": "Max findings per review", "group": "Review",
+        "type": "int", "default": 8, "input": "number",
+        "help": "Only the most severe findings up to this number are posted.",
+    },
+    # ── Notifications ────────────────────────────────────────────
+    {
+        "key": "GITLAB_COMMENTS", "label": "Comments posted to GitLab", "group": "Notifications",
+        "type": "str", "default": "mr", "input": "choice",
+        "options": [("mr", "MR review only, one comment per MR updated in place (recommended)"),
+                    ("all", "Everything: MR, push, pipeline, deployment and issue comments"),
+                    ("none", "Nothing: results go only to Google Chat and the dashboard")],
+        "help": "GitLab emails MR/commit participants for every new comment. With the recommended option "
+                "each MR gets a single bot comment that is edited on later pushes (edits do not send "
+                "emails), and push, pipeline, deployment and issue results go only to Google Chat.",
+    },
 ]
 
 _BY_KEY: dict[str, dict] = {f["key"]: f for f in SETTINGS_SCHEMA}
@@ -82,6 +114,8 @@ _cache: dict[str, str] = {}
 def _coerce(field: dict, raw: str):
     """Convert a stored string into the field's typed value, falling back to default."""
     if raw is None or raw == "":
+        return field["default"]
+    if field.get("options") and raw not in {value for value, _ in field["options"]}:
         return field["default"]
     try:
         if field["type"] == "int":
@@ -104,6 +138,16 @@ def get(key: str):
     """Return the typed value for a setting (DB value, else schema default)."""
     field = _BY_KEY[key]
     return _coerce(field, _cache.get(key, ""))
+
+
+def gitlab_comments(kind: str) -> bool:
+    """Whether the bot may post a comment to GitLab. kind: "mr_review" or "other"."""
+    mode = get("GITLAB_COMMENTS")
+    if mode == "all":
+        return True
+    if mode == "none":
+        return False
+    return kind == "mr_review"
 
 
 def get_raw(key: str) -> str:

@@ -1,7 +1,7 @@
 import logging
 import time
 
-from .. import llm_client, prompts
+from .. import llm_client, prompts, settings
 from ..gitlab_client import GitLabClient
 from ._common import notify_and_save
 
@@ -81,7 +81,9 @@ async def handle_deployment(payload: dict) -> None:
             f"_Analyzed by `{model}`._"
         )
 
-        if short_sha:
+        if not settings.gitlab_comments("other"):
+            log.info("  GitLab comment skipped (GITLAB_COMMENTS=%s), result goes to Google Chat only", settings.get("GITLAB_COMMENTS"))
+        elif short_sha:
             try:
                 await gl.post_commit_comment(project_id, short_sha, comment)
                 log.info("  Posted deployment report on commit %s", short_sha)

@@ -1,11 +1,17 @@
+import fnmatch
 import logging
 import time
-import fnmatch
+from datetime import datetime, timezone
 
-from . import db, google_chat, llm_client, prompts, settings
+from . import db, findings as fnd, google_chat, llm_client, prompts, settings
 from .gitlab_client import GitLabClient
 
 log = logging.getLogger(__name__)
+
+# Hidden marker that identifies the bot's single review comment on an MR.
+REVIEW_NOTE_MARKER = "<!-- code-review-bot:mr-review -->"
+LEGACY_REVIEW_HEADER = "## Automated Code Review"
+MAX_DESCRIPTION_CHARS = 1500
 
 
 def _split_diff_by_hunks(diff_text: str) -> list[str]:
@@ -84,48 +90,120 @@ def split_diffs(diffs: list[dict], max_chars: int) -> list[str]:
     return chunks
 
 
-async def _review_chunk(title: str, diff_block: str, model: str) -> str:
-    return await llm_client.chat(
+async def _llm_findings(title: str, description: str, diff_block: str, model: str) -> list[fnd.Finding]:
+    raw = await llm_client.chat(
         [
-            {"role": "system", "content": prompts.SYSTEM_PROMPT},
-            {"role": "user", "content": prompts.CHUNK_PROMPT.format(title=title, diff_block=diff_block)},
+            {"role": "system", "content": prompts.REVIEW_SYSTEM},
+            {"role": "user", "content": prompts.REVIEW_PROMPT.format(
+                title=title,
+                description=(description or "(none)")[:MAX_DESCRIPTION_CHARS],
+                diff_block=diff_block,
+            )},
         ],
         model=model,
+        json_mode=True,
     )
+    return fnd.parse_findings(raw)
 
 
-async def _single_pass(title: str, description: str, diff_block: str, model: str) -> str:
-    return await llm_client.chat(
-        [
-            {"role": "system", "content": prompts.SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": prompts.SINGLE_PASS_PROMPT.format(
-                    title=title, description=description or "(none)", diff_block=diff_block
-                ),
-            },
-        ],
-        model=model,
-    )
+async def _confirmed(finding: fnd.Finding, diffs: list[dict], model: str) -> bool:
+    """Second, skeptical LLM pass. Keeps the finding if the answer can't be parsed."""
+    try:
+        raw = await llm_client.chat(
+            [
+                {"role": "system", "content": prompts.VERIFY_SYSTEM},
+                {"role": "user", "content": prompts.VERIFY_PROMPT.format(
+                    file=finding.file,
+                    diff=fnd.file_diff_context(diffs, finding),
+                    quote=finding.quote,
+                    issue=finding.issue,
+                )},
+            ],
+            model=model,
+            json_mode=True,
+        )
+    except Exception:
+        log.exception("    verify call failed, keeping finding %s:%s", finding.file, finding.line)
+        return True
+    is_real, reason = fnd.parse_verdict(raw)
+    if is_real is False:
+        log.info("    drop (verifier: %s): %s:%s — %s", reason or "false positive",
+                 finding.file, finding.line, finding.issue[:80])
+        return False
+    return True
 
 
-async def _summarize(title: str, description: str, findings: list[str], model: str) -> str:
-    joined = "\n\n---\n\n".join(f"Chunk {i + 1}:\n{f}" for i, f in enumerate(findings))
-    return await llm_client.chat(
-        [
-            {"role": "system", "content": prompts.SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": prompts.SUMMARY_PROMPT.format(
-                    title=title,
-                    description=description or "(none)",
-                    n_chunks=len(findings),
-                    findings=joined,
-                ),
-            },
-        ],
-        model=model,
-    )
+async def review_diffs(diffs: list[dict], title: str, description: str, model: str) -> tuple[list[fnd.Finding], int]:
+    """Review a set of GitLab diff entries. Returns (confirmed findings, number of chunks)."""
+    chunks = split_diffs(diffs, settings.get("MAX_CHUNK_CHARS"))
+    if not chunks:
+        return [], 0
+
+    proposed: list[fnd.Finding] = []
+    for i, chunk in enumerate(chunks, start=1):
+        log.info("  Reviewing chunk %d/%d (%d chars)...", i, len(chunks), len(chunk))
+        t_llm = time.monotonic()
+        chunk_findings = await _llm_findings(title, description, chunk, model)
+        log.info("  Chunk %d done in %.1fs — %d finding(s) proposed", i, time.monotonic() - t_llm,
+                 len(chunk_findings))
+        proposed.extend(chunk_findings)
+
+    grounded = fnd.ground(proposed, fnd.index_added_lines(diffs), settings.get("REVIEW_MIN_CONFIDENCE"))
+    ranked = fnd.dedupe_and_rank(grounded)
+    max_findings = settings.get("REVIEW_MAX_FINDINGS")
+
+    if settings.get("REVIEW_VERIFY") == "on" and ranked:
+        # Verify at most 2x the cap so a noisy model can't trigger dozens of extra calls.
+        candidates = ranked[:max_findings * 2]
+        log.info("  Double-checking %d finding(s)...", len(candidates))
+        confirmed = [f for f in candidates if await _confirmed(f, diffs, model)]
+    else:
+        confirmed = ranked
+
+    result = confirmed[:max_findings]
+    log.info("  Findings: %d proposed → %d grounded in diff → %d reported",
+             len(proposed), len(grounded), len(result))
+    return result, len(chunks)
+
+
+async def _find_review_note(gl: GitLabClient, project_id: int, mr_iid: int) -> dict | None:
+    """The bot's existing review comment on this MR, if any."""
+    me = await gl.get_current_user()
+    for note in await gl.list_mr_notes(project_id, mr_iid):
+        if note.get("system") or (note.get("author") or {}).get("id") != me.get("id"):
+            continue
+        body = note.get("body") or ""
+        if REVIEW_NOTE_MARKER in body or body.startswith(LEGACY_REVIEW_HEADER):
+            return note
+    return None
+
+
+async def _publish_mr_review(gl: GitLabClient, project_id: int, mr_iid: int, comment: str,
+                             has_findings: bool) -> None:
+    """Keep a single bot comment per MR. New comments email every participant, edits don't."""
+    if not settings.gitlab_comments("mr_review"):
+        log.info("  GitLab comment skipped (GITLAB_COMMENTS=%s)", settings.get("GITLAB_COMMENTS"))
+        return
+
+    existing = None
+    try:
+        existing = await _find_review_note(gl, project_id, mr_iid)
+    except Exception:
+        log.exception("  Could not look up an existing review comment")
+
+    if existing:
+        try:
+            await gl.update_note(project_id, mr_iid, existing["id"], comment)
+            log.info("  Updated existing review comment (note %s) on MR !%s", existing["id"], mr_iid)
+            return
+        except Exception:
+            log.exception("  Failed to update review comment %s, posting a new one", existing["id"])
+
+    if not has_findings:
+        log.info("  No findings and no earlier comment — not posting to GitLab (avoids an email)")
+        return
+    await gl.post_note(project_id, mr_iid, comment)
+    log.info("  Posted review comment to GitLab MR !%s", mr_iid)
 
 
 async def run_review(project_id: int, mr_iid: int, project_name: str) -> None:
@@ -161,54 +239,26 @@ async def run_review(project_id: int, mr_iid: int, project_name: str) -> None:
             log.exception("[2/5] FAILED to fetch diffs from GitLab")
             return
 
+        webhook_config = await db.get_webhook_config(project_id)
+        diffs = filter_ignored_diffs(diffs, (webhook_config or {}).get("ignore_patterns", ""))
         if not diffs:
-            log.info("  No diffs found, nothing to review. Done.")
+            log.info("  No diffs to review (empty or all ignored). Done.")
             return
 
-        webhook_config = await db.get_webhook_config(project_id)
-        ignore_patterns = (webhook_config or {}).get("ignore_patterns", "")
-        diffs = filter_ignored_diffs(diffs, ignore_patterns)
         title = mr.get("title") or f"MR !{mr_iid}"
         description = mr.get("description") or ""
         web_url = mr.get("web_url") or ""
+        head_sha = (mr.get("sha") or "")[:8]
 
-        # --- Chunk and review ---
+        # --- Review ---
         model = (webhook_config or {}).get("model") or settings.get("OLLAMA_MODEL")
-        chunks = split_diffs(diffs, settings.get("MAX_CHUNK_CHARS"))
         log.info("[3/5] Reviewing with LLM (%s)...", model)
-        log.info("  Split into %d chunk(s)", len(chunks))
-
         try:
-            if len(chunks) == 1:
-                log.info("  Single-pass review (1 chunk)...")
-                t_llm = time.monotonic()
-                summary = await _single_pass(title, description, chunks[0], model)
-                log.info("  LLM responded in %.1fs", time.monotonic() - t_llm)
-            else:
-                findings: list[str] = []
-                for i, chunk in enumerate(chunks, start=1):
-                    log.info("  Reviewing chunk %d/%d (%d chars)...", i, len(chunks), len(chunk))
-                    t_llm = time.monotonic()
-                    content = await _review_chunk(title, chunk, model)
-                    elapsed = time.monotonic() - t_llm
-                    if content.strip().upper() != "NO_FINDINGS":
-                        findings.append(content)
-                        log.info("  Chunk %d done in %.1fs — findings detected", i, elapsed)
-                    else:
-                        log.info("  Chunk %d done in %.1fs — no findings", i, elapsed)
-                if not findings:
-                    summary = "**Overall:** No issues found.\n\n**Verdict:** Looks good."
-                    log.info("  No findings in any chunk.")
-                else:
-                    log.info("  Aggregating %d chunk findings into summary...", len(findings))
-                    t_llm = time.monotonic()
-                    summary = await _summarize(title, description, findings, model)
-                    log.info("  Summary generated in %.1fs", time.monotonic() - t_llm)
+            findings, chunks_count = await review_diffs(diffs, title, description, model)
         except Exception:
             log.exception("[3/5] FAILED — LLM review error")
             return
-
-        log.info("  Review text length: %d chars", len(summary))
+        summary = fnd.render_markdown(findings)
 
         # --- Save to DB ---
         log.info("[4/5] Saving review to database...")
@@ -220,25 +270,26 @@ async def run_review(project_id: int, mr_iid: int, project_name: str) -> None:
                 mr_title=title,
                 mr_url=web_url,
                 model=model,
-                chunks_count=len(chunks),
+                chunks_count=chunks_count,
                 review_text=summary,
             )
             log.info("  Saved as review id=%s", review_id)
         except Exception:
             log.exception("[4/5] FAILED to save review to DB")
 
-        # --- Post to GitLab + Google Chat ---
+        # --- Post to GitLab ---
+        reviewed_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
         comment = (
-            f"## Automated Code Review\n\n"
+            f"{REVIEW_NOTE_MARKER}\n"
+            f"{LEGACY_REVIEW_HEADER}\n\n"
             f"{summary}\n\n"
             f"---\n"
-            f"_Reviewed by `{model}` across {len(chunks)} chunk(s)._"
+            f"_Reviewed by `{model}` at commit `{head_sha}` · {reviewed_at}. "
+            f"This comment is updated on every push._"
         )
-
         log.info("[5/5] Posting results...")
         try:
-            await gl.post_note(project_id, mr_iid, comment)
-            log.info("  Posted comment to GitLab MR !%s", mr_iid)
+            await _publish_mr_review(gl, project_id, mr_iid, comment, has_findings=bool(findings))
         except Exception:
             log.exception("  FAILED to post comment to GitLab")
 

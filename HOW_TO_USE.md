@@ -135,7 +135,7 @@ Bot prijme webhook ──→ Stiahne kontext z GitLab API
     ▼
 LLM analyzuje kód (Ollama, beží lokálne)
     │
-    ├──→ Postne zistenia ako GitLab komentáre (vždy)
+    ├──→ Zapíše/aktualizuje komentár v GitLabe (podľa nastavenia „Comments posted to GitLab“)
     ├──→ Pošle Google Chat notifikáciu (ak je nastavená)
     └──→ Uloží do databázy (história review)
 ```
@@ -147,13 +147,17 @@ LLM analyzuje kód (Ollama, beží lokálne)
 ### Merge Request Review
 
 - **Spúšťa sa pri:** MR otvorený, znovuotvorený alebo aktualizovaný s novými commitmi.
-- **Čo robí:** AI skontroluje diff a postne detailný komentár na MR.
+- **Čo robí:** AI skontroluje diff a zapíše na MR **jeden** komentár. Pri ďalších pushoch sa ten istý komentár
+  upraví (úprava neposiela e-mail). Ak bot nič nenájde a komentár ešte neexistuje, do GitLabu nepíše nič.
+- **Falošné poplachy:** model musí ku každému nálezu citovať presný pridaný riadok z diffu. Nálezy, ktorých citát
+  v diffe nie je, s nízkou istotou alebo zamietnuté druhou kontrolou, sa zahodia. Nastavenia: **Settings → Review**.
 - **Auto-popis:** Ak je popis MR prázdny, bot ho automaticky vygeneruje z diffu.
 
 ### Push Review
 
-- **Spúšťa sa pri:** Commity pushnuté priamo do vetvy (mimo MR).
-- **Čo robí:** Skontroluje pushnuté commity a postne komentár na posledný commit.
+- **Spúšťa sa pri:** Commity pushnuté do vetvy, ktorá **nemá** otvorený MR (push do MR pokrýva MR review).
+- **Čo robí:** Skontroluje celkový diff pushu a pošle výsledok do Google Chatu. Komentár na commit pribudne
+  len pri nastavení „Everything“.
 
 ### Analýza zlyhania Pipeline
 
@@ -164,12 +168,13 @@ LLM analyzuje kód (Ollama, beží lokálne)
 ### Triaž Issues
 
 - **Spúšťa sa pri:** Vytvorený nový issue.
-- **Čo robí:** Klasifikuje issue, navrhne labely a závažnosť, postne súhrnný komentár.
+- **Čo robí:** Klasifikuje issue a pridá labely. Súhrnný komentár na issue pribudne len pri nastavení „Everything“,
+  inak ide súhrn do Google Chatu.
 
 ### Analýza Deploymentu
 
 - **Spúšťa sa pri:** Deployment uspel alebo zlyhal.
-- **Čo robí:** Analyzuje deployment a postne report na súvisiacom commite.
+- **Čo robí:** Analyzuje deployment a pošle report do Google Chatu (komentár na commit len pri nastavení „Everything“).
 
 ### Release Notes
 
