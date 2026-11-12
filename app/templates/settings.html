@@ -58,6 +58,12 @@
                 </div>
                 <span class="combobox-status" data-combobox-status></span>
             </div>
+            {% elif f.input == 'choice' %}
+            <select id="{{ f.key }}" name="{{ f.key }}" aria-describedby="help_{{ f.key }}">
+                {% for value, text in f.options %}
+                <option value="{{ value }}" {% if f.value == value %}selected{% endif %}>{{ text }}</option>
+                {% endfor %}
+            </select>
             {% elif f.input == 'number' %}
             <input type="number" step="any" id="{{ f.key }}" name="{{ f.key }}"
                    value="{{ f.value }}" aria-describedby="help_{{ f.key }}">

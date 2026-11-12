@@ -40,7 +40,9 @@ The bot hooks into your GitLab instance and processes multiple event types:
 
 1. **Receives** webhook events from GitLab (MR, push, pipeline, issues, deployments, releases, emoji).
 2. **Analyzes** each event with a local Ollama model — reviews code, diagnoses failures, triages issues.
-3. **Posts** findings back to GitLab (MR comments, commit comments, issue labels and notes).
+3. **Posts** findings back to GitLab: by default one MR review comment that is edited in place on later pushes
+   (edits don't send notification emails). Other events go to Google Chat only unless
+   *Settings → Notifications → Comments posted to GitLab* is set to *Everything*.
 4. **Saves** all events and reviews to SQLite for history and auditing.
 5. **Notifies** the team via Google Chat (if configured for that project).
 
@@ -51,14 +53,14 @@ The bot hooks into your GitLab instance and processes multiple event types:
 |                        | Feature                        | Description                                                                            |
 |------------------------|--------------------------------|----------------------------------------------------------------------------------------|
 | :robot:                | **AI Code Review**             | Single-pass or chunked review using a local Ollama model (no data leaves your network) |
-| :pushpin:              | **Push Review**                | Review commits pushed directly to branches (outside MRs)                               |
+| :pushpin:              | **Push Review**                | Review pushes to branches that have no open MR                                         |
 | :red_circle:           | **Pipeline Failure Analysis**  | Analyze failed CI/CD job logs, find root cause, suggest fixes                          |
 | :memo:                 | **MR Description Generation**  | Auto-fill empty MR descriptions from the diff                                          |
 | :label:                | **Issue Triage**               | Auto-classify new issues — assign labels, severity, and summary                        |
 | :rocket:               | **Release Notes**              | Generate changelogs from merged MRs when a tag or release is created                   |
 | :package:              | **Deployment Analysis**        | Analyze failed/successful deployments, post reports on commits                         |
 | :repeat:               | **Emoji Re-trigger**           | Re-run a review by adding an emoji (default: :repeat:) to a MR                        |
-| :speech_balloon:       | **GitLab Integration**         | Posts findings as MR comments, commit comments, and issue notes                        |
+| :speech_balloon:       | **GitLab Integration**         | One MR comment per MR, updated in place; more comment types are opt-in                 |
 | :bell:                 | **Google Chat Notifications**  | Rich Card notifications per-project for all event types                                |
 | :globe_with_meridians: | **Admin Dashboard**            | Web UI for managing webhooks, browsing reviews, and monitoring health                  |
 | :lock:                 | **Password login**             | Single shared password gates the admin UI (for trusted networks)                       |
@@ -231,12 +233,14 @@ Webhook ─▸ Parse event ─▸ Fetch context ─▸ LLM analysis ─▸ Save 
 
 - Split by file first.
 - If a single file exceeds `MAX_CHUNK_CHARS`, split by hunk (`@@` markers).
-- Each chunk is reviewed independently, then findings are aggregated into a final summary.
-- Chunks returning `NO_FINDINGS` are excluded from aggregation.
+- Each chunk is reviewed independently; the model returns JSON findings that quote the exact added line.
+- Findings whose quote is not on a `+` line of the diff are dropped, as are those below
+  `REVIEW_MIN_CONFIDENCE` and, with `REVIEW_VERIFY=on`, those a second skeptical LLM pass rejects.
+- The remaining findings are deduplicated, ranked by severity, capped at `REVIEW_MAX_FINDINGS` and rendered.
 
 **Google Chat Cards v2** format:
 
-- MR reviews: separate cards per section (Blocking, Overall, Suggested, Nits, Verdict).
+- MR reviews: separate cards per section (Overall, Blocking, Suggested, Verdict).
 - Other events: single card with event-specific icon and title.
 - Markdown converted to safe HTML (bold, italic, code, links, bullets).
 - Clickable button linking to the relevant GitLab resource.
