@@ -244,7 +244,7 @@ def _render_item(f: Finding) -> str:
     first_quote_line = _clean_quote(f.quote).split("\n")[0]
     lines = [f"- **`{f.file}:{f.line}`** — {f.issue}", f"  {_code(first_quote_line)}"]
     if f.fix:
-        lines.append(f"  _Fix:_ {f.fix}")
+        lines.append(f"  *Fix:* {f.fix}")
     return "\n".join(lines)
 
 
