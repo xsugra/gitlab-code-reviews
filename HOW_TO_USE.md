@@ -183,10 +183,10 @@ LLM analyzuje kód (Ollama, beží lokálne)
 
 ### Emoji Re-trigger
 
-- **Spúšťa sa pri:** Niekto pridá nakonfigurovanú emoji (predvolene: `:repeat:`) na MR.
+- **Spúšťa sa pri:** Niekto pridá nakonfigurovanú emoji (predvolene 🔁 `:repeat:` alebo 🔄 `:arrows_counterclockwise:`) na MR alebo na komentár v MR (napr. na komentár bota).
 - **Čo robí:** Znovu spustí code review na danom MR.
 - **Nastavenie:** Uistite sa, že **Emoji events** je zapnutý vo vašich GitLab webhook triggeroch.
-- **Použitie:** Otvorte MR, kliknite na výber emoji a pridajte `:repeat:` emoji.
+- **Použitie:** Otvorte MR, kliknite na výber emoji a pridajte 🔁 `:repeat:` alebo 🔄 `:arrows_counterclockwise:`. Zoznam emoji sa dá zmeniť v *Settings → Review → Re-trigger emoji* (oddelené čiarkou).
 
 ---
 
@@ -232,7 +232,7 @@ V admin rozhraní (`/code-review-bot/webhooks`) môžete:
 
 ### Chcem znovu spustiť review
 
-Pridajte `:repeat:` emoji na MR. Uistite sa, že **Emoji events** je zapnutý v GitLab webhook triggeroch.
+Pridajte 🔁 `:repeat:` alebo 🔄 `:arrows_counterclockwise:` emoji na MR alebo na komentár bota. Uistite sa, že **Emoji events** je zapnutý v GitLab webhook triggeroch.
 
 ### Veľký MR trvá príliš dlho / vyprší čas
 
