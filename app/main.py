@@ -345,32 +345,45 @@ def _handle_tag_push_webhook(payload: dict, background: BackgroundTasks) -> dict
     return {"queued": True, "event": "tag_push", "tag": tag}
 
 
+def _retrigger_emojis() -> set[str]:
+    """Configured re-trigger emoji names: comma/space separated, colons optional."""
+    raw = settings.get("REVIEW_RETRIGGER_EMOJI") or ""
+    return {name.strip().strip(":").lower() for name in raw.replace(",", " ").split() if name.strip(":")}
+
+
 def _handle_emoji_webhook(payload: dict, background: BackgroundTasks) -> dict:
     attrs = payload.get("object_attributes") or {}
     user = (payload.get("user") or {}).get("username", "unknown")
-    emoji_name = attrs.get("name", "unknown")
+    emoji_name = (attrs.get("name") or "unknown").lower()
 
-    if attrs.get("action") != "award":
-        log.info("Emoji ignored: action=%s (emoji=:%s: by %s)", attrs.get("action"), emoji_name, user)
+    # GitLab puts award/revoke in the top-level `event_type`; `object_attributes`
+    # carries only the award itself (lib/gitlab/data_builder/emoji.rb). Some docs
+    # examples also show `object_attributes.action`, so accept either.
+    action = payload.get("event_type") or attrs.get("action")
+    if action != "award":
+        log.info("Emoji ignored: action=%s (emoji=:%s: by %s)", action, emoji_name, user)
         return {"ignored": "emoji not awarded"}
 
-    retrigger_emoji = settings.get("REVIEW_RETRIGGER_EMOJI")
-    if emoji_name != retrigger_emoji:
-        log.debug("Emoji ignored: :%s: by %s (trigger emoji is :%s:)", emoji_name, user, retrigger_emoji)
+    retrigger = _retrigger_emojis()
+    if emoji_name not in retrigger:
+        log.info("Emoji ignored: :%s: by %s (re-trigger emoji: %s)",
+                 emoji_name, user, ", ".join(f":{e}:" for e in sorted(retrigger)) or "none")
         return {"ignored": f"emoji={emoji_name}"}
 
-    if attrs.get("awardable_type") != "MergeRequest":
-        log.info("Emoji ignored: :%s: by %s on %s (only MergeRequest supported)",
-                 emoji_name, user, attrs.get("awardable_type", "unknown"))
-        return {"ignored": "emoji not on MR"}
-
+    # Directly on the MR, or on a comment in the MR (e.g. on the bot's review
+    # comment): in both cases GitLab includes the `merge_request` object.
+    awardable_type = attrs.get("awardable_type")
     mr = payload.get("merge_request")
-    if not mr or not mr.get("iid"):
-        log.warning("Emoji re-trigger failed: :%s: by %s — merge_request data missing from payload", emoji_name, user)
+    if awardable_type not in ("MergeRequest", "Note") or not mr:
+        log.info("Emoji ignored: :%s: by %s on %s (only merge requests and their comments)",
+                 emoji_name, user, awardable_type or "unknown")
+        return {"ignored": "emoji not on MR"}
+    if not mr.get("iid"):
+        log.warning("Emoji re-trigger failed: :%s: by %s — merge_request.iid missing from payload", emoji_name, user)
         return {"ignored": "no MR data"}
 
     project = payload.get("project") or {}
-    project_id = project.get("id")
+    project_id = project.get("id") or payload.get("project_id")
     mr_iid = mr["iid"]
     project_name = project.get("path_with_namespace") or "unknown"
 

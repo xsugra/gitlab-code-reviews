@@ -59,7 +59,7 @@ The bot hooks into your GitLab instance and processes multiple event types:
 | :label:                | **Issue Triage**               | Auto-classify new issues — assign labels, severity, and summary                        |
 | :rocket:               | **Release Notes**              | Generate changelogs from merged MRs when a tag or release is created                   |
 | :package:              | **Deployment Analysis**        | Analyze failed/successful deployments, post reports on commits                         |
-| :repeat:               | **Emoji Re-trigger**           | Re-run a review by adding an emoji (default: :repeat:) to a MR                        |
+| :repeat:               | **Emoji Re-trigger**           | Re-run a review by adding 🔁 / 🔄 to a MR or a comment on it                          |
 | :speech_balloon:       | **GitLab Integration**         | One MR comment per MR, updated in place; more comment types are opt-in                 |
 | :bell:                 | **Google Chat Notifications**  | Rich Card notifications per-project for all event types                                |
 | :globe_with_meridians: | **Admin Dashboard**            | Web UI for managing webhooks, browsing reviews, and monitoring health                  |
@@ -118,7 +118,7 @@ Enable the triggers you need:
 | Deployment events     | Analyze failed/successful deployments                    |
 | Releases events       | Generate release notes from merged MRs                   |
 | Tag push events       | Generate release notes when a tag is pushed              |
-| Emoji events          | Re-trigger review when :repeat: emoji is added to a MR  |
+| Emoji events          | Re-trigger review when 🔁 / 🔄 is added to a MR       |
 
 That's it — open a merge request and the bot will review it automatically.
 
@@ -190,7 +190,7 @@ Projects without a webhook still get reviews on GitLab — they just don't get a
 | `OLLAMA_TEMPERATURE`     | `0.2`                    | Generation temperature             |
 | `OLLAMA_TIMEOUT_S`       | `1800`                   | LLM request timeout (seconds)      |
 | `MAX_CHUNK_CHARS`        | `80000`                  | Diff chunk size limit              |
-| `REVIEW_RETRIGGER_EMOJI` | `repeat`                 | Emoji name that re-triggers review |
+| `REVIEW_RETRIGGER_EMOJI` | `repeat, arrows_counterclockwise` | Emoji name(s) that re-trigger review |
 
 ---
 

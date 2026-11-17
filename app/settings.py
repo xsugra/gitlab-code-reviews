@@ -68,9 +68,10 @@ SETTINGS_SCHEMA: list[dict] = [
     },
     {
         "key": "REVIEW_RETRIGGER_EMOJI", "label": "Re-trigger emoji", "group": "Review",
-        "type": "str", "default": "repeat", "input": "text",
-        "help": "GitLab emoji name (no colons) that re-triggers a review when added to an MR. "
-                "e.g. `repeat` = 🔄. Requires \"Emoji events\" enabled on the webhook.",
+        "type": "str", "default": "repeat, arrows_counterclockwise", "input": "text",
+        "help": "GitLab emoji name(s), comma separated, that re-trigger a review when added to an MR "
+                "or to a comment on it. `repeat` = 🔁, `arrows_counterclockwise` = 🔄. "
+                "Requires \"Emoji events\" enabled on the webhook.",
     },
     {
         "key": "REVIEW_MIN_CONFIDENCE", "label": "Minimum finding confidence", "group": "Review",
