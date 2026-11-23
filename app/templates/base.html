@@ -9,52 +9,55 @@
     <link rel="stylesheet" href="/static/main.css">
 </head>
 <body class="{% block body_class %}{% endblock %}">
-    {% block body %}
-    <nav class="container-fluid">
-        <ul>
-            <li><a href="/" class="brand"><img src="/static/logo.png" alt="" style="width:28px;height:28px;vertical-align:middle;margin-right:0.4rem">Code Review Bot</a></li>
-        </ul>
-        <ul>
-            <li><a href="/">Home</a></li>
-            <li><a href="/code-review-bot/">Dashboard</a></li>
-            <li><a href="/code-review-bot/webhooks">Webhooks</a></li>
-            <li><a href="/code-review-bot/settings">Settings</a></li>
-            <li><a href="/code-review-bot/reviews">Reviews</a></li>
-            <li><a href="/code-review-bot/health">Health</a></li>
-            <li><a href="/api-docs">API</a></li>
-            {% if session %}
-            <li>
+{% block body %}
+<nav class="container-fluid">
+    <ul>
+        <li><a href="/" class="brand"><img src="/static/logo.png" alt=""
+                                           style="width:28px;height:28px;vertical-align:middle;margin-right:0.4rem">Code
+            Review Bot</a></li>
+    </ul>
+    <ul>
+        <li><a href="/">Home</a></li>
+        <li><a href="/code-review-bot/">Dashboard</a></li>
+        <li><a href="/code-review-bot/webhooks">Webhooks</a></li>
+        <li><a href="/code-review-bot/settings">Settings</a></li>
+        <li><a href="/code-review-bot/reviews">Reviews</a></li>
+        <li><a href="/code-review-bot/health">Health</a></li>
+        <li><a href="/api-docs">API</a></li>
+        {% if session %}
+        <li>
                 <span class="user-info">
                     {% if session.avatar_url %}
                     <img src="{{ session.avatar_url }}" alt="">
                     {% endif %}
                     {{ session.username }}
                 </span>
-            </li>
-            <li>
-                <form action="/code-review-bot/logout" method="post" style="margin:0">
-                    <button type="submit" class="outline secondary" style="padding:0.25rem 0.75rem;margin:0">Logout</button>
-                </form>
-            </li>
-            {% else %}
-            <li>
-                <a href="/code-review-bot/" role="button" class="outline" style="padding:0.25rem 0.75rem;margin:0">Sign In</a>
-            </li>
-            {% endif %}
-        </ul>
-    </nav>
-
-    <main class="container">
-        {% if flash is defined and flash %}
-        <div class="flash flash-{{ flash_type|default('success') }}">{{ flash }}</div>
+        </li>
+        <li>
+            <form action="/code-review-bot/logout" method="post" style="margin:0">
+                <button type="submit" class="outline secondary" style="padding:0.25rem 0.75rem;margin:0">Logout</button>
+            </form>
+        </li>
+        {% else %}
+        <li>
+            <a href="/code-review-bot/" role="button" class="outline" style="padding:0.25rem 0.75rem;margin:0">Sign
+                In</a>
+        </li>
         {% endif %}
-        {% block content %}{% endblock %}
-    </main>
+    </ul>
+</nav>
 
-    <footer class="container" style="text-align:center;padding:2rem 0;color:var(--pico-muted-color);font-size:0.85rem;">
-        GitLab Code Review Bot &mdash; Admin Dashboard
-    </footer>
-    {% endblock %}
-    <script src="/static/combobox.js" defer></script>
+<main class="container">
+    {% if flash is defined and flash %}
+    <div class="flash flash-{{ flash_type|default('success') }}">{{ flash }}</div>
+    {% endif %}
+    {% block content %}{% endblock %}
+</main>
+
+<footer class="container" style="text-align:center;padding:2rem 0;color:var(--pico-muted-color);font-size:0.85rem;">
+    GitLab Code Review Bot &mdash; Admin Dashboard
+</footer>
+{% endblock %}
+<script src="/static/combobox.js" defer></script>
 </body>
 </html>

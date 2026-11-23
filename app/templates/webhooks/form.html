@@ -71,7 +71,9 @@
                     <button type="button" class="combobox-toggle" data-combobox-toggle
                             aria-label="Show installed models" tabindex="-1">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                             stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                             stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
                     </button>
                 </div>
                 <div class="combobox-panel" data-combobox-panel hidden>
@@ -88,16 +90,19 @@
                                 <line x1="12" y1="22.08" x2="12" y2="12"/>
                             </svg>
                             <span class="combobox-option-name">{{ m.split(':')[0] }}</span>
-                            {% if ':' in m %}<span class="combobox-option-tag">{{ m.split(':', 1)[1] }}</span>{% endif %}
+                            {% if ':' in m %}<span class="combobox-option-tag">{{ m.split(':', 1)[1] }}</span>{% endif
+                            %}
                             <svg class="combobox-check" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                                 stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                 stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                                 stroke-linejoin="round">
                                 <polyline points="20 6 9 17 4 12"/>
                             </svg>
                         </li>
                         {% endfor %}
                     </ul>
                     <div class="combobox-empty" data-combobox-empty {% if installed_models %}hidden{% endif %}>
-                        {% if installed_models %}No match — press Enter to use a custom name.{% else %}No models installed in Ollama. Type a name to use one you'll pull later.{% endif %}
+                        {% if installed_models %}No match — press Enter to use a custom name.{% else %}No models
+                        installed in Ollama. Type a name to use one you'll pull later.{% endif %}
                     </div>
                 </div>
                 <span class="combobox-status" data-combobox-status></span>
