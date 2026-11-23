@@ -32,7 +32,8 @@ Prístup z browsera:
 
 - PC 1: GitLab already running and accessible
 - PC 2: Ubuntu with min. 16GB RAM (for 14B model), ideally GPU
-- PC 2 host tools: `git`, `make`, and `sqlite3` installed on the host (used by `make upgrade` / `backup.sh`, which run outside Docker)
+- PC 2 host tools: `git`, `make`, and `sqlite3` installed on the host (used by `make upgrade` / `backup.sh`, which run
+  outside Docker)
 - Both PCs on the same network
 - Ports open between them (see firewall section)
 
@@ -85,12 +86,14 @@ sudo systemctl edit ollama
 ```
 
 Add:
+
 ```ini
 [Service]
-Environment="OLLAMA_HOST=0.0.0.0"
+Environment = "OLLAMA_HOST=0.0.0.0"
 ```
 
 Then restart:
+
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl restart ollama
@@ -119,9 +122,9 @@ mkdir -p data
 
 1. Go to GitLab → User Settings → Access Tokens
 2. Create token:
-   - Name: `code-review-bot`
-   - Scopes: `api`
-   - Expiration: set as needed
+    - Name: `code-review-bot`
+    - Scopes: `api`
+    - Expiration: set as needed
 3. Copy the token (starts with `glpat-`)
 
 ### 2.2 Configure Webhook on project(s)
@@ -130,10 +133,11 @@ For each GitLab project you want reviewed:
 
 1. Go to Project → Settings → Webhooks
 2. Add webhook:
-   - **URL:** `http://192.168.1.20:8888/webhook`
-   - **Secret Token:** (same value you'll put in `GITLAB_WEBHOOK_SECRET`)
-   - **Triggers:** Merge request events, Push events, Pipeline events, Work item events, Deployment events, Releases events, Tag push events, Emoji events
-   - **SSL verification:** Disable (since we use HTTP)
+    - **URL:** `http://192.168.1.20:8888/webhook`
+    - **Secret Token:** (same value you'll put in `GITLAB_WEBHOOK_SECRET`)
+    - **Triggers:** Merge request events, Push events, Pipeline events, Work item events, Deployment events, Releases
+      events, Tag push events, Emoji events
+    - **SSL verification:** Disable (since we use HTTP)
 3. Save
 
 ---
@@ -225,14 +229,26 @@ curl http://localhost:8888/health/full | python3 -m json.tool
 ```
 
 ### Expected output from /health/full:
+
 ```json
 {
-    "model": "qwen2.5-coder:14b",
-    "ollama": {"status": "ok", ...},
-    "gitlab": {"status": "ok", ...},
-    "db": {"status": "ok", ...},
-    "google_chat": {"status": "not configured"},
-    "healthy": true
+  "model": "qwen2.5-coder:14b",
+  "ollama": {
+    "status": "ok",
+    ...
+  },
+  "gitlab": {
+    "status": "ok",
+    ...
+  },
+  "db": {
+    "status": "ok",
+    ...
+  },
+  "google_chat": {
+    "status": "not configured"
+  },
+  "healthy": true
 }
 ```
 
@@ -255,32 +271,41 @@ curl http://localhost:8888/health/full | python3 -m json.tool
 ## Troubleshooting
 
 ### Bot can't reach GitLab
+
 ```bash
 # From PC 2, test connectivity to GitLab
 curl http://192.168.1.10:8088/api/v4/version
 ```
+
 If fails: check firewall on PC 1, check GitLab is bound to 0.0.0.0 not 127.0.0.1.
 
 ### Bot can't reach Ollama
+
 ```bash
 # Test Ollama from inside Docker
 docker exec review-bot curl http://host.docker.internal:11434/api/tags
 ```
+
 If fails: check Ollama is running with `OLLAMA_HOST=0.0.0.0`.
 
 ### Can't sign in to the admin UI
+
 - Verify `ADMIN_PASSWORD` and `SESSION_SECRET` are both set in `.env`
 - After changing them, recreate the container: `docker compose up -d --force-recreate`
 
 ### Webhook not triggering
+
 ```bash
 # Check GitLab webhook delivery history
 # Go to: Project → Settings → Webhooks → Edit → Recent deliveries
 ```
+
 Common issues: wrong URL, wrong secret token, firewall blocking PC1 → PC2.
 
 ### Large MR timeout
+
 Increase `OLLAMA_TIMEOUT_S` or switch to a smaller model:
+
 ```env
 OLLAMA_MODEL=qwen2.5-coder:7b
 ```
@@ -290,6 +315,7 @@ OLLAMA_MODEL=qwen2.5-coder:7b
 ## Maintenance
 
 ### Update the bot
+
 ```bash
 cd /opt/code-review-bot
 git pull
@@ -297,16 +323,19 @@ docker compose up -d --build
 ```
 
 ### View logs
+
 ```bash
 docker compose logs -f --tail=100
 ```
 
 ### Backup database
+
 ```bash
 cp data/reviews.db data/reviews.db.backup-$(date +%Y%m%d)
 ```
 
 ### Change model
+
 ```bash
 # Pull new model
 ollama pull codellama:34b
@@ -322,9 +351,9 @@ docker compose up -d
 
 ## Network Access Summary
 
-| From | To | What they see |
-|------|----|---------------|
-| Any PC on network | `http://<BOT_IP>:8888/` | Homepage with live status |
-| Any PC on network | `http://<BOT_IP>:8888/code-review-bot/` | Admin (requires GitLab login) |
-| GitLab server | `http://<BOT_IP>:8888/webhook` | Receives GitLab webhook events |
-| Bot server | `http://<GITLAB_IP>:<PORT>/api/v4/` | Posts review comments |
+| From              | To                                      | What they see                  |
+|-------------------|-----------------------------------------|--------------------------------|
+| Any PC on network | `http://<BOT_IP>:8888/`                 | Homepage with live status      |
+| Any PC on network | `http://<BOT_IP>:8888/code-review-bot/` | Admin (requires GitLab login)  |
+| GitLab server     | `http://<BOT_IP>:8888/webhook`          | Receives GitLab webhook events |
+| Bot server        | `http://<GITLAB_IP>:<PORT>/api/v4/`     | Posts review comments          |
