@@ -40,9 +40,9 @@ The bot hooks into your GitLab instance and processes multiple event types:
 
 1. **Receives** webhook events from GitLab (MR, push, pipeline, issues, deployments, releases, emoji).
 2. **Analyzes** each event with a local Ollama model — reviews code, diagnoses failures, triages issues.
-3. **Posts** findings back to GitLab: by default one MR review comment that is edited in place on later pushes
-   (edits don't send notification emails). Other events go to Google Chat only unless
-   *Settings → Notifications → Comments posted to GitLab* is set to *Everything*.
+3. **Posts** findings back to GitLab: by default one MR review comment that is edited in place on later pushes (edits
+   don't send notification emails). Other events go to Google Chat only unless *Settings → Notifications → Comments
+   posted to GitLab* is set to *Everything*.
 4. **Saves** all events and reviews to SQLite for history and auditing.
 5. **Notifies** the team via Google Chat (if configured for that project).
 
@@ -50,22 +50,22 @@ The bot hooks into your GitLab instance and processes multiple event types:
 
 ## Features
 
-|                        | Feature                        | Description                                                                            |
-|------------------------|--------------------------------|----------------------------------------------------------------------------------------|
-| :robot:                | **AI Code Review**             | Single-pass or chunked review using a local Ollama model (no data leaves your network) |
-| :pushpin:              | **Push Review**                | Review pushes to branches that have no open MR                                         |
-| :red_circle:           | **Pipeline Failure Analysis**  | Analyze failed CI/CD job logs, find root cause, suggest fixes                          |
-| :memo:                 | **MR Description Generation**  | Auto-fill empty MR descriptions from the diff                                          |
-| :label:                | **Issue Triage**               | Auto-classify new issues — assign labels, severity, and summary                        |
-| :rocket:               | **Release Notes**              | Generate changelogs from merged MRs when a tag or release is created                   |
-| :package:              | **Deployment Analysis**        | Analyze failed/successful deployments, post reports on commits                         |
-| :repeat:               | **Emoji Re-trigger**           | Re-run a review by adding 🔁 / 🔄 to a MR or a comment on it                          |
-| :speech_balloon:       | **GitLab Integration**         | One MR comment per MR, updated in place; more comment types are opt-in                 |
-| :bell:                 | **Google Chat Notifications**  | Rich Card notifications per-project for all event types                                |
-| :globe_with_meridians: | **Admin Dashboard**            | Web UI for managing webhooks, browsing reviews, and monitoring health                  |
-| :lock:                 | **Password login**             | Single shared password gates the admin UI (for trusted networks)                       |
-| :whale:                | **Docker Deployment**          | Single `docker compose up` — no complex setup                                          |
-| :floppy_disk:          | **Event History**              | All reviews and events stored in SQLite with search and filtering                      |
+|                        | Feature                       | Description                                                                            |
+|------------------------|-------------------------------|----------------------------------------------------------------------------------------|
+| :robot:                | **AI Code Review**            | Single-pass or chunked review using a local Ollama model (no data leaves your network) |
+| :pushpin:              | **Push Review**               | Review pushes to branches that have no open MR                                         |
+| :red_circle:           | **Pipeline Failure Analysis** | Analyze failed CI/CD job logs, find root cause, suggest fixes                          |
+| :memo:                 | **MR Description Generation** | Auto-fill empty MR descriptions from the diff                                          |
+| :label:                | **Issue Triage**              | Auto-classify new issues — assign labels, severity, and summary                        |
+| :rocket:               | **Release Notes**             | Generate changelogs from merged MRs when a tag or release is created                   |
+| :package:              | **Deployment Analysis**       | Analyze failed/successful deployments, post reports on commits                         |
+| :repeat:               | **Emoji Re-trigger**          | Re-run a review by adding 🔁 / 🔄 to a MR or a comment on it                           |
+| :speech_balloon:       | **GitLab Integration**        | One MR comment per MR, updated in place; more comment types are opt-in                 |
+| :bell:                 | **Google Chat Notifications** | Rich Card notifications per-project for all event types                                |
+| :globe_with_meridians: | **Admin Dashboard**           | Web UI for managing webhooks, browsing reviews, and monitoring health                  |
+| :lock:                 | **Password login**            | Single shared password gates the admin UI (for trusted networks)                       |
+| :whale:                | **Docker Deployment**         | Single `docker compose up` — no complex setup                                          |
+| :floppy_disk:          | **Event History**             | All reviews and events stored in SQLite with search and filtering                      |
 
 ---
 
@@ -109,16 +109,16 @@ In your GitLab project under **Settings → Webhooks**:
 
 Enable the triggers you need:
 
-| Trigger               | What it does                                             |
-|-----------------------|----------------------------------------------------------|
-| Merge request events  | Code review + auto-fill empty MR descriptions            |
-| Push events           | Review commits pushed directly to branches               |
-| Pipeline events       | Analyze failed CI/CD pipelines                           |
-| Work item events      | Auto-triage new issues (labels + severity)               |
-| Deployment events     | Analyze failed/successful deployments                    |
-| Releases events       | Generate release notes from merged MRs                   |
-| Tag push events       | Generate release notes when a tag is pushed              |
-| Emoji events          | Re-trigger review when 🔁 / 🔄 is added to a MR       |
+| Trigger              | What it does                                    |
+|----------------------|-------------------------------------------------|
+| Merge request events | Code review + auto-fill empty MR descriptions   |
+| Push events          | Review commits pushed directly to branches      |
+| Pipeline events      | Analyze failed CI/CD pipelines                  |
+| Work item events     | Auto-triage new issues (labels + severity)      |
+| Deployment events    | Analyze failed/successful deployments           |
+| Releases events      | Generate release notes from merged MRs          |
+| Tag push events      | Generate release notes when a tag is pushed     |
+| Emoji events         | Re-trigger review when 🔁 / 🔄 is added to a MR |
 
 That's it — open a merge request and the bot will review it automatically.
 
@@ -157,10 +157,12 @@ immediately, no restart needed.
 1. Go to **Webhooks → Add New Webhook**.
 2. Enter the **Project ID** (GitLab → project Settings → General).
 3. Paste the **Google Chat Webhook URL** (Space settings → Manage webhooks).
-4. *(Optional)* Set a **Model override** — pick an installed model or type a custom name. Leave empty to use the global default. Applies to all LLM events for that project.
+4. *(Optional)* Set a **Model override** — pick an installed model or type a custom name. Leave empty to use the global
+   default. Applies to all LLM events for that project.
 5. Click **Create**, then **Test** to verify.
 
-Projects without a webhook still get reviews on GitLab — they just don't get a chat notification (and use the global default model).
+Projects without a webhook still get reviews on GitLab — they just don't get a chat notification (and use the global
+default model).
 
 ---
 
@@ -179,18 +181,18 @@ Projects without a webhook still get reviews on GitLab — they just don't get a
 
 ### Runtime settings (admin UI → Settings, stored in DB)
 
-| Setting                  | Default                  | Purpose                            |
-|--------------------------|--------------------------|------------------------------------|
-| `GITLAB_URL`             | —                        | GitLab instance base URL           |
-| `GITLAB_TOKEN`           | —                        | GitLab token with `api` scope      |
-| `GITLAB_WEBHOOK_SECRET`  | empty                    | Validates `X-Gitlab-Token` header  |
-| `OLLAMA_URL`             | `http://host.docker.internal:11434` | Ollama API endpoint     |
-| `OLLAMA_MODEL`           | `qwen2.5-coder:14b-instruct-q8_0`   | LLM model name          |
-| `OLLAMA_NUM_CTX`         | `32768`                  | Context window (tokens)            |
-| `OLLAMA_TEMPERATURE`     | `0.2`                    | Generation temperature             |
-| `OLLAMA_TIMEOUT_S`       | `1800`                   | LLM request timeout (seconds)      |
-| `MAX_CHUNK_CHARS`        | `80000`                  | Diff chunk size limit              |
-| `REVIEW_RETRIGGER_EMOJI` | `repeat, arrows_counterclockwise` | Emoji name(s) that re-trigger review |
+| Setting                  | Default                             | Purpose                              |
+|--------------------------|-------------------------------------|--------------------------------------|
+| `GITLAB_URL`             | —                                   | GitLab instance base URL             |
+| `GITLAB_TOKEN`           | —                                   | GitLab token with `api` scope        |
+| `GITLAB_WEBHOOK_SECRET`  | empty                               | Validates `X-Gitlab-Token` header    |
+| `OLLAMA_URL`             | `http://host.docker.internal:11434` | Ollama API endpoint                  |
+| `OLLAMA_MODEL`           | `qwen2.5-coder:14b-instruct-q8_0`   | LLM model name                       |
+| `OLLAMA_NUM_CTX`         | `32768`                             | Context window (tokens)              |
+| `OLLAMA_TEMPERATURE`     | `0.2`                               | Generation temperature               |
+| `OLLAMA_TIMEOUT_S`       | `1800`                              | LLM request timeout (seconds)        |
+| `MAX_CHUNK_CHARS`        | `80000`                             | Diff chunk size limit                |
+| `REVIEW_RETRIGGER_EMOJI` | `repeat, arrows_counterclockwise`   | Emoji name(s) that re-trigger review |
 
 ---
 
@@ -198,14 +200,14 @@ Projects without a webhook still get reviews on GitLab — they just don't get a
 
 ### Public
 
-| Method | Endpoint       | Description                                              |
-|:------:|----------------|----------------------------------------------------------|
-| `GET`  | `/`            | Homepage with live status                                |
-| `GET`  | `/api-docs`    | API documentation page                                   |
-| `GET`  | `/health`      | Liveness check + active model                            |
-| `GET`  | `/health/full` | Deep health check (Ollama, GitLab, DB, webhooks)         |
-| `POST` | `/webhook`     | GitLab webhook receiver (all event types)                |
-| `GET`  | `/reviews`     | Review history (query: `project_id`, `mr_iid`, `limit`)  |
+| Method | Endpoint       | Description                                                |
+|:------:|----------------|------------------------------------------------------------|
+| `GET`  | `/`            | Homepage with live status                                  |
+| `GET`  | `/api-docs`    | API documentation page                                     |
+| `GET`  | `/health`      | Liveness check + active model                              |
+| `GET`  | `/health/full` | Deep health check (Ollama, GitLab, DB, webhooks)           |
+| `POST` | `/webhook`     | GitLab webhook receiver (all event types)                  |
+| `GET`  | `/reviews`     | Review history (query: `project_id`, `mr_iid`, `limit`)    |
 | `GET`  | `/events`      | Event history (query: `event_type`, `project_id`, `limit`) |
 
 ### Admin UI (password required)
@@ -250,15 +252,15 @@ Webhook ─▸ Parse event ─▸ Fetch context ─▸ LLM analysis ─▸ Save 
 
 ## Security
 
-| Measure              | Implementation                                                |
-|----------------------|---------------------------------------------------------------|
+| Measure              | Implementation                                                   |
+|----------------------|------------------------------------------------------------------|
 | **Authentication**   | Single shared password (`ADMIN_PASSWORD`), constant-time compare |
-| **Sessions**         | HMAC-SHA256 signed cookies, HttpOnly, SameSite=Lax, 8h expiry |
-| **CSRF**             | Per-session token validated on every POST                     |
-| **XSS**              | Jinja2 autoescaping on all templates                          |
-| **URL masking**      | Webhook URLs shown truncated in list view                     |
-| **Input validation** | Project ID > 0, webhook URLs must be HTTPS                    |
-| **Logging**          | Webhook URLs and secrets are never logged                     |
+| **Sessions**         | HMAC-SHA256 signed cookies, HttpOnly, SameSite=Lax, 8h expiry    |
+| **CSRF**             | Per-session token validated on every POST                        |
+| **XSS**              | Jinja2 autoescaping on all templates                             |
+| **URL masking**      | Webhook URLs shown truncated in list view                        |
+| **Input validation** | Project ID > 0, webhook URLs must be HTTPS                       |
+| **Logging**          | Webhook URLs and secrets are never logged                        |
 
 > **HTTP note**: Without a TLS reverse proxy, the password and cookies transit unencrypted. Acceptable on a trusted
 > internal network; add HTTPS for internet-facing deployments. Because GitLab tokens are stored in the database,
