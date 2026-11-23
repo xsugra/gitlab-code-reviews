@@ -70,7 +70,6 @@ It is a false positive if any of these hold:
 
 Respond with JSON only: {{"verdict": "real" or "false_positive", "reason": "one sentence"}}"""
 
-
 # ── Pipeline failure analysis ────────────────────────────────────
 
 PIPELINE_ANALYSIS_SYSTEM = """You are a CI/CD expert analyzing a failed pipeline.
@@ -100,7 +99,6 @@ Rules:
 - Focus on the actual error, not the surrounding noise.
 - If multiple jobs failed for the same reason, group them.
 - Keep the entire response under 400 words."""
-
 
 # ── MR description generation ───────────────────────────────────
 
@@ -132,7 +130,6 @@ Rules:
 - Keep it under 300 words.
 - Do not include the diff itself in the description."""
 
-
 # ── Issue triage ─────────────────────────────────────────────────
 
 ISSUE_TRIAGE_SYSTEM = """You are a technical project manager triaging incoming issues.
@@ -160,7 +157,6 @@ Rules:
 - "type" is your classification — it does not need to match a label.
 - "severity" — critical: production down or data loss; high: major functionality broken; medium: noticeable issue with workaround; low: minor or cosmetic.
 - Keep "summary" under 30 words."""
-
 
 # ── Release notes ────────────────────────────────────────────────
 
@@ -192,7 +188,6 @@ Rules:
 - Be concise — under 200 words.
 - For failures, focus on the actual error, not surrounding noise.
 - For successes, just confirm what was deployed."""
-
 
 # ── Release notes ────────────────────────────────────────────────
 

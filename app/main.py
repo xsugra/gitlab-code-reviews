@@ -60,10 +60,12 @@ async def homepage(request: Request):
     session = _get_session(request)
     return templates.TemplateResponse("home.html", {"request": request, "session": session})
 
+
 @app.get("/api-docs", response_class=HTMLResponse)
 async def api_docs(request: Request):
     session = _get_session(request)
     return templates.TemplateResponse("api_docs.html", {"request": request, "session": session})
+
 
 @app.get("/health")
 async def health() -> dict:

@@ -161,8 +161,16 @@ _SCHEMA = """
 
           CREATE TABLE IF NOT EXISTS app_settings
           (
-              key   TEXT PRIMARY KEY,
-              value TEXT NOT NULL DEFAULT ''
+              key
+              TEXT
+              PRIMARY
+              KEY,
+              value
+              TEXT
+              NOT
+              NULL
+              DEFAULT
+              ''
           ); \
           """
 
@@ -358,8 +366,8 @@ async def set_settings(values: dict[str, str]) -> None:
     async with aiosqlite.connect(DB_PATH) as conn:
         await conn.executemany(
             """INSERT INTO app_settings (key, value)
-               VALUES (?, ?)
-               ON CONFLICT(key) DO UPDATE SET value = excluded.value""",
+               VALUES (?, ?) ON CONFLICT(key) DO
+            UPDATE SET value = excluded.value""",
             [(k, v) for k, v in values.items()],
         )
         await conn.commit()
